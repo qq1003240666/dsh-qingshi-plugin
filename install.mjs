@@ -19,6 +19,7 @@
 import { readFile, writeFile, mkdir, cp, access, rm, stat, rename, readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve, basename } from 'node:path'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -125,6 +126,16 @@ async function main() {
     return
   }
 
+  // 0) 重装会清空目标目录；如果目标里已经装过 Electron 而源里没有，
+  //    先把 Electron 挪到临时目录，拷完再放回去（否则窗口会从 electron 掉成 Chrome app）
+  const destElectron = join(dest, 'shell', 'node_modules', 'electron')
+  let stash = ''
+  if (!wantElectron && (await exists(join(destElectron, 'dist', 'electron.exe')))) {
+    stash = join(tmpdir(), `qingshi-electron-${Date.now()}`)
+    await cp(destElectron, stash, { recursive: true, force: true })
+    say('  · 检测到目标里已有 Electron，重装后会保留')
+  }
+
   // 1) 拷贝插件本体（跳过 shell/node_modules：单独处理）
   await rm(dest, { recursive: true, force: true })
   await mkdir(dest, { recursive: true })
@@ -141,6 +152,14 @@ async function main() {
   })
 
   // 2) Electron 运行时：有就拷，没有就留空（插件会自动退回 app 模式）
+  if (stash) {
+    const restoreTo = join(dest, 'shell', 'node_modules', 'electron')
+    await mkdir(dirname(restoreTo), { recursive: true })
+    await cp(stash, restoreTo, { recursive: true, force: true })
+    await rm(stash, { recursive: true, force: true })
+    say('  · Electron 运行时已保留（复用上次安装的那份）')
+  }
+
   if (wantElectron && hasElectron) {
     const electronDest = join(dest, 'shell', 'node_modules', 'electron', 'dist')
     await mkdir(electronDest, { recursive: true })
