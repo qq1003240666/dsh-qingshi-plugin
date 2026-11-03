@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install peer dependencies
+        run: npm install --no-audit --no-fund
+      - name: Smoke test (loads the plugin with a fake host, checks all 29 tools)
+        run: npm test
+      - name: Package check
+        run: npm pack --dry-run

@@ -1,0 +1,29 @@
+- insert:
+    - id: qingshi
+      name: 'dsh-qingshi'
+      config:
+        apiBaseUrl: https://api.iyouwc.cn
+        # 真 H5 站点：窗口、页面操作、截图、登录态同步都打这个
+        webBaseUrl: https://qingshi.iyouwc.cn
+        # 两个 token 存这儿：<workspaceDir>/auth.json。留空 = $DSH_HOME/qingshi-workspace
+        workspaceDir: ''
+        # 代家人写记录：默认关；打开后 qingshi_record 才能写 targetUid
+        allowFamilyWrite: false
+        # 调 qingshi_login / qingshi_open_h5 时自动打开窗口
+        autoOpenBrowser: true
+        # 自动记录：off=只在你明确要求时写 / suggest=先问一句再写 / auto=判断为经历就直接写
+        autoRecord: suggest
+        # 每个请求都带 X-Client-Platform。后端按 uid + 这个值存 refresh_token，
+        # 所以插件用自己的值就不会和微信小程序 / h5 互相顶号
+        clientPlatform: plugin
+        # 登录时通过请求头 X-Client-Platform 告诉后端的平台名（留空 = 不拦截，后端会记成 h5）
+        requestPlatform: plugin
+        # 窗口形态：
+        #   electron = 自带桌面外壳，无边框 + 自绘奶油色标题栏，只有一个 ✕（推荐）
+        #   app      = Chrome 应用窗口，固定宽高，带系统标题栏（最小化/最大化/关闭）
+        #   kiosk    = Chrome 无边框全屏 + 自绘标题条
+        windowMode: electron
+        # 窗口固定尺寸，形如 1180x880
+        windowSize: 1180x880
+        # Electron 外壳的 profile（登录态 / CDP 端口都在里面）。留空 = <workspaceDir>/electron-profile
+        electronProfileDir: ''

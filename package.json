@@ -1,0 +1,61 @@
+{
+  "name": "dsh-qingshi",
+  "version": "0.15.1",
+  "description": "Qingshi (青史) diary and family-tree assistant: reads and writes career records, resolves relatives by kinship term, and drives the real H5 pages in a desktop window.",
+  "type": "module",
+  "license": "MIT",
+  "author": "qq1003240666",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qq1003240666/dsh-qingshi-plugin.git"
+  },
+  "homepage": "https://github.com/qq1003240666/dsh-qingshi-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/qq1003240666/dsh-qingshi-plugin/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "deepseek-harness",
+    "qingshi",
+    "diary",
+    "family-tree"
+  ],
+  "engines": {
+    "node": ">=22.4.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": ">=0.0.1-rc.1 <0.1.0 || >=0.1.0-rc.1 <0.2.0-0 || >=0.2.0-rc.1 <0.3.0-0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "install.mjs",
+    "lib/*.js",
+    "shell/main.js",
+    "shell/preload.js",
+    "shell/package.json",
+    "bin/*",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "assets/*",
+    "docs/*.md",
+    "README.md",
+    "LICENSE",
+    "test/*.mjs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  }
+}

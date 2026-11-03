@@ -1,0 +1,10 @@
+{
+  "name": "qingshi-shell",
+  "private": true,
+  "version": "0.1.0",
+  "description": "青史插件的桌面外壳（Electron 无边框窗口）",
+  "main": "main.js",
+  "dependencies": {
+    "electron": "24.8.8"
+  }
+}
