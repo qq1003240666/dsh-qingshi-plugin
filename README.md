@@ -1,8 +1,121 @@
 # dsh-qingshi —— 青史 × DeepSeek Harness 插件
 
+## 这个插件解决什么问题
+
+[「青史永存」](https://qingshi.iyouwc.cn) 是一个记录自己故事、也为家人记故事的小程序，顺带带着族谱。
+但它是个封闭的小程序：你的故事就躺在里面，只有你自己翻得动。
+
+装上这个插件，Harness 里的 AI 就接上了这些数据——它知道你是谁、今年多大、去过哪些地方、
+你爷爷叫什么、你表侄子是谁；你说「记一笔」，它能把这几句话变成一条真正的生涯记录。
+
+关键在于：**不是把你的数据导出成文件喂给 AI，而是现场查你自己的青史账号**。
+问什么查什么，答案永远是最新的；写进去的东西回到小程序里也看得见。
+
+![生涯时间轴](assets/screenshot-career.png)
+
+### 装上之后，可以直接这样问
+
+| 你说 | 插件做什么 |
+| --- | --- |
+| 你知道我是谁吗？我今年多大？ | 读账号资料：昵称、性别、生日、标签、简介，算出年龄 |
+| 我去过哪些地方？2024 年我在做什么？ | 查生涯记录，按年份/月/标签/地点筛，给列表或汇总 |
+| 我表侄子是谁？我爷爷叫什么？我外婆还在吗？ | 从称谓倒推关系链（妈妈 → 兄弟姐妹 → 他们的孩子 → 再下一代），沿族谱一层层走；走不通会说清断在哪一层 |
+| 把 2024 年那趟九寨沟调出来给我看 | 打开那条记录的详情页，不是念一遍文本 |
+| 帮我记一笔：今天带女儿去了青龙峡 | 先落本地草稿，或打开发布页预填好内容，**你自己点发布** |
+| 把族谱展开，按小家庭排整齐 | 在真实族谱页面上点菜单展开、按小家庭重排位置（不改任何关系、不改根节点） |
+
+### 想记的东西，默认不会自己跑上去
+
+这是刻意的设计：AI 可以帮你整理，但**发布权在你手里**。
+
+- 写记录 = 打开发布页、把标题正文填好，最后一步永远是你点「发布」
+- 记录默认可见性「所有人可见」，需要改成「仅自己可见」时插件会提醒，也提供 `privacy` 参数
+- token 只存在本机 `~/.dsh/qingshi-workspace/auth.json`（权限 0600），不经过对话、不写进日志
+- 除了你自己配置的 `apiBaseUrl` / `webBaseUrl`，不发任何请求到别处
+
+<details>
+<summary><b>它是怎么做到的（三步）</b></summary>
+
+1. **登录一次**：插件自带一个本地登录窗（不是网页跳转），用小程序里绑定的手机号登录，两个 token 落到本机。
+   ![登录窗](assets/screenshot-login.png)
+2. **读写都走青史自己的接口**：复刻小程序端的 `httpRequest`（`Authorization: Bearer` + 401 自动用 refresh_token 续期），
+   不爬页面、不模拟点击。
+3. **页面类操作走真窗口**：需要「看页面」「点菜单」时，插件开一个无边框窗口加载 `qingshi.iyouwc.cn`，
+   用 CDP 读页面、点按钮、输入、截图。
+
+族谱页属于第三类——它是画布，数据不在接口里：
+
+![族谱](assets/screenshot-familytree.png)
+
+> 上图是示意图（名字是假的）。真实族谱里每个节点还有头像、生卒日期、与你相差几代。
+
+</details>
+
+### 它不是什么
+
+- 不是日记生成器：不会编故事，查不到就说查不到
+- 不是爬虫：所有读写都走青史官方接口和你自己的账号
+- 不会替你点发布、不会替你改族谱关系
+- 不是跨平台的：主开发和验证只做了 Windows（macOS/Linux 理论上能跑，未实测）
+
+
+---
+
 ## English
 
-A DeepSeek Harness plugin for **Qingshi (青史)** — a personal diary and family-tree app.
+### What it is for
+
+**Qingshi (青史)** is a mini program where you keep your own life stories and your family's, with a family tree
+attached. It is closed: your stories sit inside it and only you can scroll through them.
+
+Install this plugin and the AI in Harness is wired to that account — it knows who you are, how old you are,
+where you have been, what your grandfather is called and who your cousin's children are. Say "note this down"
+and it turns the sentence into a real career record.
+
+The important part: it does **not** export your data into a file for the AI to read.
+It queries your live Qingshi account, so answers are always current and anything written shows up in the mini program too.
+
+![Career timeline](assets/screenshot-career.png)
+
+| You say | The plugin does |
+| --- | --- |
+| Who am I? How old am I? | reads the account profile (nickname, gender, birthday, tags) and computes age |
+| Where have I been? What was I doing in 2024? | searches career records by year / month / tag / location |
+| Who is my 表侄 (cousin's grandchild)? What is my grandfather's name? | walks the family tree from a kinship term; says exactly which generation broke when it cannot find someone |
+| Show me that Jiuzhaigou trip from 2024 | opens the real detail page instead of re-printing the text |
+| Note this down: took my daughter to Qinglong Gorge today | drafts it locally, or opens the add-event page prefilled — **you** press publish |
+| Expand the family tree and lay it out by household | clicks the real page's menus and re-layouts the cards (never edits relations or the root node) |
+
+### Writing stays in your hands
+
+AI may help you tidy things up, but publishing is always yours:
+
+- writing a record = opening the publish page with title and body prefilled; the last click is yours
+- new records default to "visible to everyone"; the plugin warns you about that and accepts a `privacy` argument
+- tokens live only in `~/.dsh/qingshi-workspace/auth.json` (mode 0600), never in the conversation or the logs
+- no request goes anywhere except the `apiBaseUrl` / `webBaseUrl` you configure
+
+### How it works
+
+1. **Sign in once** — the plugin opens its own small login window (not a web redirect); you use the phone number already bound in the mini program.
+2. **Reads and writes go through Qingshi's own API** — a faithful port of the mini program's `httpRequest` (Bearer token, refresh on 401), no scraping.
+3. **Page-level actions use a real window** — for "show me" and "click that menu", it opens a borderless window on `qingshi.iyouwc.cn` and drives it over CDP.
+
+The family tree is page-level, because it is a canvas and its data is not in the API:
+
+![Family tree](assets/screenshot-familytree.png)
+
+> The screenshot above is an illustration with placeholder names.
+
+### What it is not
+
+- not a story generator: it will not invent entries; if a search finds nothing it says so
+- not a scraper: every read and write goes through the official API with your own account
+- it never publishes for you and never edits family relations
+- Windows is the only tested platform
+
+### Tools
+
 It registers 29 tools so a Harness agent can:
 
 - read and write career records (list, detail, add, edit, delete, restore, privacy setting);

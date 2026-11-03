@@ -1,6 +1,6 @@
 {
   "name": "dsh-qingshi",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "Qingshi (青史) diary and family-tree assistant: reads and writes career records, resolves relatives by kinship term, and drives the real H5 pages in a desktop window.",
   "type": "module",
   "license": "MIT",
