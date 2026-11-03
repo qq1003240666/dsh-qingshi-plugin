@@ -22,6 +22,8 @@ It registers 29 tools so a Harness agent can:
 
 ## 中文
 
+> 版本变化见 [CHANGELOG.md](CHANGELOG.md)。
+
 让 Harness 里的对话能**直接操作青史这个应用本身**：打开 `qingshi.iyouwc.cn` 的独立窗口、
 读页面、点按、输入、截图，顺带用青史自己的接口做可靠读写。
 

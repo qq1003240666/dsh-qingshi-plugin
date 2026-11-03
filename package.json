@@ -46,6 +46,7 @@
     "icon.svg",
     "assets/*",
     "docs/*.md",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE",
     "test/*.mjs"
