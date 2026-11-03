@@ -11,6 +11,14 @@ It registers 29 tools so a Harness agent can:
 - sign in with the phone number that already has a Qingshi account, and keep both tokens in a local workspace;
 - prepare an "add event" page with prefilled content and let the user press publish.
 
+**Install** (not published to npm yet — use the tarball)
+
+```sh
+dsh plugin add https://github.com/qq1003240666/dsh-qingshi-plugin/releases/download/v0.15.1/dsh-qingshi.tgz
+```
+
+Then fully quit and reopen Harness.
+
 **Requirements**
 
 - A Qingshi account. Register in the WeChat mini program 「青史永存」 and bind a phone number first — the plugin signs in with that number.
@@ -278,23 +286,24 @@ qingshi_publish  → 要 OSS 签名 → 直传 OSS → confirm → /add_event �
 
 ## 安装
 
-三种方式，任选一种：
+两种方式，任选一种。
 
-**A. 从 npm（推荐）**
+> 本包**暂未发布到 npm**，所以 `dsh plugin add dsh-qingshi` 现在会去注册表里找一个不存在的名字。请用下面 A 或 B。
 
-```sh
-dsh plugin add dsh-qingshi
-```
+**A. 从 GitHub Release 的 tarball（推荐）**
 
-**B. 从 GitHub Release 的 tarball**
-
-在 [Releases](https://github.com/qq1003240666/dsh-qingshi-plugin/releases) 下载 `dsh-qingshi.tgz`，然后：
+下载 [v0.15.1 的 `dsh-qingshi.tgz`](https://github.com/qq1003240666/dsh-qingshi-plugin/releases/download/v0.15.1/dsh-qingshi.tgz)，然后：
 
 ```sh
 dsh plugin add ./dsh-qingshi.tgz
+
+# 也可以直接把 https 地址交给插件管理器
+dsh plugin add https://github.com/qq1003240666/dsh-qingshi-plugin/releases/download/v0.15.1/dsh-qingshi.tgz
 ```
 
-**C. 从源码（本地开发）**
+在 Harness 界面里则是：设置 → 插件管理器 → 安装 → 粘贴上面的 tarball 地址（或本地绝对路径）。
+
+**B. 从源码（改代码时用这个）**
 
 ```sh
 git clone https://github.com/qq1003240666/dsh-qingshi-plugin.git
