@@ -95,11 +95,39 @@ codex mcp add qingshi --command node --args /绝对路径/dsh-qingshi-plugin/bin
 
 - **发布权在你手里。** 插件不会替你点「发布」。它最多把页面打开、内容填好，最后一步你自己确认。
 - **新记录默认「所有人可见」。** 需要仅自己可见时直接说一声，插件会改成私有，或创建时就带上这个设置。
-- **登录凭证只存在本机。** `~/.dsh/qingshi-workspace/auth.json`，权限 0600；不进对话、不进日志。
+- **登录凭证只存在本机。** 放在下面「数据存在哪」那个目录的 `auth.json`，权限 0600；不进对话、不进日志。
 - **只连你自己配置的地址。** 默认 `api.iyouwc.cn` 与 `qingshi.iyouwc.cn`，不会发到别处。
 - **不会编造。** 查不到就说查不到，不会为了好听给你编一段经历。
 - **不改你的数据。** 除了你明确要求的记录增改，插件不会动族谱关系、不会改根节点。
 - **暂未上架 npm**，所以 `dsh plugin add dsh-qingshi` 这条短命令目前用不了，请用上面的 tarball 地址。
+
+---
+
+## 数据存在哪
+
+一个系统用户只有一份，**跟你在哪个 AI 里用没关系**——DSH 插件、Claude Code、Codex、命令行都是同一份，登录一次到处能用：
+
+| 平台 | 目录 |
+| --- | --- |
+| Windows | `%APPDATA%\qingshi`（一般是 `C:\Users\<你>\AppData\Roaming\qingshi`） |
+| macOS | `~/Library/Application Support/qingshi` |
+| Linux | `$XDG_CONFIG_HOME/qingshi`，没设就是 `~/.config/qingshi` |
+
+里面这些东西：
+
+| 文件 | 是什么 |
+| --- | --- |
+| `auth.json` | 登录凭证（`access_token` + `refresh_token`），权限 0600 |
+| `browser-window.json` | 那个青史窗口的进程号与调试端口，保证只开一个、各处共用 |
+| `browser-storage.json` | 页面状态快照（族谱的缩放、展开到哪一层），换窗口也能接着看 |
+| `users.json` | 家人的昵称 / 生日 / 标签缓存 |
+| `drafts.json` + `media/` | 本地草稿和草稿里的图片（发布时才上传） |
+| `trash/` | 删除记录时的本地快照，可恢复 |
+| `electron-profile/`、`browser-profile/` | 窗口自己的浏览器配置（登录态、缓存） |
+| `shots/` | 截图 |
+
+想换地方：设环境变量 `QINGSHI_HOME=/some/dir`，或在插件配置里写 `workspaceDir`（MCP 里是 `QINGSHI_WORKSPACE`）。
+老版本存在 `~/.dsh/qingshi-workspace` 或当前目录的，第一次运行会自动搬过来，登录态不会丢。
 
 ---
 

@@ -5,7 +5,7 @@
         apiBaseUrl: https://api.iyouwc.cn
         # 真 H5 站点：窗口、页面操作、截图、登录态同步都打这个
         webBaseUrl: https://qingshi.iyouwc.cn
-        # 两个 token 存这儿：<workspaceDir>/auth.json。留空 = $DSH_HOME/qingshi-workspace
+        # 两个 token 存这儿：<workspaceDir>/auth.json。留空 = 平台默认目录（Windows 是 %APPDATA%\qingshi）
         workspaceDir: ''
         # 代家人写记录：默认关；打开后 qingshi_record 才能写 targetUid
         allowFamilyWrite: false

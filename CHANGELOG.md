@@ -6,6 +6,16 @@
 - **minor**：新增工具、新增页面/窗口形态、新增配置项
 - **patch**：修 bug、改提示词、调样式、改文档
 
+## 0.18.0
+
+- 统一数据目录：所有宿主（DSH 插件、MCP、Claude Code、Codex、命令行）共用一份
+  - Windows `%APPDATA%\qingshi`、macOS `~/Library/Application Support/qingshi`、Linux `~/.config/qingshi`
+  - 覆盖方式：插件配置 `workspaceDir`、或环境变量 `QINGSHI_HOME` / `QINGSHI_WORKSPACE`
+  - 老版本放在 `~/.dsh/qingshi-workspace`、`<cwd>/.qingshi-workspace` 的数据会一次性搬过来（只补缺、不覆盖、不搬 `shots/`）
+- Electron / Chrome 的浏览器 profile 也固定到数据目录下的 `electron-profile/`、`browser-profile/`，不再随当前目录漂
+- MCP `serverInfo.version` 改为直接读 `package.json`，避免版本号写死后走样
+- 新增 `test/paths.mjs`（12 条断言），`npm test` 现在是 12 + 125 + 23 = 160 条
+
 ## 0.17.0
 
 - 新增：`qingshi_login` 支持**无窗口环境**（MCP、远程、没有浏览器的机器）——传 `phone` 发短信、传 `code` 完成登录，凭证一样落本机

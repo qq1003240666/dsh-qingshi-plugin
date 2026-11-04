@@ -15,7 +15,8 @@ try {
 } catch {
   // 非 DSH 环境：保持恒等实现
 }
-import { createWorkspace, defaultWorkspaceDir } from './lib/workspace.js'
+import { createWorkspace } from './lib/workspace.js'
+import { resolveHomeDir, migrateLegacy, shouldMigrate } from './lib/paths.js'
 import { createRequest } from './lib/request.js'
 import { createDraftStore } from './lib/drafts.js'
 import { createUploader } from './lib/upload.js'
@@ -188,9 +189,13 @@ function eventText(item) {
 }
 
 export function apply(ctx, config = {}) {
+  // 数据目录：显式配置 > QINGSHI_HOME > 平台默认（Windows 是 %APPDATA%\qingshi）。
+  // 老版本放在 ~/.dsh/qingshi-workspace 或当前目录，这里一次性搬过来，登录态不用重来。
+  const dataDir = resolveHomeDir(config)
+  if (shouldMigrate(config)) migrateLegacy(dataDir)
   const cfg = {
     apiBaseUrl: String(config.apiBaseUrl || 'https://api.iyouwc.cn').replace(/\/+$/, ''),
-    workspaceDir: String(config.workspaceDir || defaultWorkspaceDir()),
+    workspaceDir: dataDir,
     allowFamilyWrite: config.allowFamilyWrite === true,
     autoOpenBrowser: config.autoOpenBrowser !== false,
     openLoginWindow: config.openLoginWindow !== false,
@@ -205,7 +210,7 @@ export function apply(ctx, config = {}) {
     // 真 H5 站点（截图/浏览/自动化都打这个）
     webBaseUrl: String(config.webBaseUrl || 'https://qingshi.iyouwc.cn').replace(/\/+$/, ''),
     // 浏览器 profile 目录（登录态靠它跨会话保留；端口由 Chrome 自己挑，从 DevToolsActivePort 读回来）
-    browserProfileDir: String(config.browserProfileDir || join(String(config.workspaceDir || defaultWorkspaceDir()), 'browser-profile')),
+    browserProfileDir: String(config.browserProfileDir || join(dataDir, 'browser-profile')),
     // 窗口形态：
     //   electron = 自带桌面外壳（无边框 + 自绘标题栏，只有一个 ✕，推荐）
     //   app      = Chrome 应用窗口（固定宽高，系统标题栏三个按钮）
@@ -217,9 +222,7 @@ export function apply(ctx, config = {}) {
     // Electron 外壳的 userData（登录态、CDP 端口都在这）。
     // 注意：DSH 的受限令牌只对「会话工作区」可写，~/.dsh 与 %TEMP% 都会被拒，
     // 所以默认放工作区；electron-shell 里还会再探一次可写性做兜底。
-    electronProfileDir: String(
-      config.electronProfileDir || join(process.env.DSH_WORKSPACE || process.cwd(), '.qingshi-electron-profile'),
-    ),
+    electronProfileDir: String(config.electronProfileDir || join(dataDir, 'electron-profile')),
     // 窗口固定尺寸，形如 "1180x880"
     windowSize: (() => {
       const raw = String(config.windowSize || '1180x880').toLowerCase().replace(new RegExp('\\s+', 'g'), '')

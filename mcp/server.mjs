@@ -4,12 +4,20 @@
 // 复用的就是 DSH 插件本身：这里造一个假的 ctx 接住 ctx.tools.register()，
 // 工具定义、登录、请求层、族谱自动化全是同一份代码，不存在第二套实现。
 import { createInterface } from 'node:readline'
+import { readFileSync } from 'node:fs'
 
 import * as plugin from '../index.js'
 
 const PROTOCOL_VERSION = '2024-11-05'
 const SERVER_NAME = 'qingshi'
-const SERVER_VERSION = '0.16.0'
+const SERVER_VERSION = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+    return String(pkg.version || '0.0.0')
+  } catch {
+    return '0.0.0'
+  }
+})()
 
 function envConfig() {
   const env = process.env

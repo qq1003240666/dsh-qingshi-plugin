@@ -1,6 +1,6 @@
 {
   "name": "dsh-qingshi",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "青史（Qingshi）日记与族谱助手 —— DSH 插件，同时也是 MCP server，Codex / Claude Code / Cursor 等任何 MCP 客户端都能用。",
   "type": "module",
   "license": "MIT",
@@ -40,25 +40,27 @@
     "./icon": "./icon.svg"
   },
   "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "assets/*",
+    "bin/*",
+    "bin/qingshi-mcp.mjs",
+    "cordis.patch.yml",
+    "docs/*.md",
+    "docs/MCP.md",
+    "icon.svg",
     "index.js",
     "install.mjs",
     "lib/*.js",
-    "shell/main.js",
-    "shell/preload.js",
-    "shell/package.json",
-    "bin/*",
-    "cordis.patch.yml",
+    "lib/paths.js",
     "locale/*.json",
-    "icon.svg",
-    "assets/*",
-    "docs/*.md",
-    "CHANGELOG.md",
-    "README.md",
-    "LICENSE",
-    "test/*.mjs",
     "mcp/",
-    "bin/qingshi-mcp.mjs",
-    "docs/MCP.md"
+    "shell/main.js",
+    "shell/package.json",
+    "shell/preload.js",
+    "test/*.mjs",
+    "test/paths.mjs"
   ],
   "dsh": {
     "bundle": {
@@ -66,7 +68,7 @@
     }
   },
   "scripts": {
-    "test": "node test/smoke.mjs && node test/mcp.mjs"
+    "test": "node test/paths.mjs && node test/smoke.mjs && node test/mcp.mjs"
   },
   "bin": {
     "qingshi-mcp": "./bin/qingshi-mcp.mjs"

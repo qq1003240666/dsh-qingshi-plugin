@@ -17,6 +17,10 @@ node <包目录>/bin/qingshi-mcp.mjs
 
 不需要安装任何依赖（包本身 `dependencies` 是空的），Node >= 22.4 即可。
 
+**数据位置**：和 DSH 插件用同一个目录（Windows 是 `%APPDATA%\qingshi`，macOS 是
+`~/Library/Application Support/qingshi`，Linux 是 `~/.config/qingshi`），所以在 DSH 里登过一次，
+在这里就不用再登。要换位置设 `QINGSHI_WORKSPACE`（或 `QINGSHI_HOME`）。
+
 **登录**：MCP 客户端里通常没有可弹的窗口，所以 `qingshi_login` 会自动走短信验证码：
 
 1. 把手机号交给它：`qingshi_login({"phone":"13800000000"})` → 会收到一条短信
