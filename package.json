@@ -1,6 +1,6 @@
 {
   "name": "dsh-qingshi",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "青史（Qingshi）日记与族谱助手 —— DSH 插件，同时也是 MCP server，Codex / Claude Code / Cursor 等任何 MCP 客户端都能用。",
   "type": "module",
   "license": "MIT",

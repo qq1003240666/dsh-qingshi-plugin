@@ -3,7 +3,7 @@
 // 用法：npm test（或 node test/smoke.mjs）
 
 const TOOL_NAMES = [
-  'qingshi_login', 'qingshi_save_login', 'qingshi_me', 'qingshi_search',
+  'qingshi_login', 'qingshi_save_login', 'qingshi_me', 'qingshi_search', 'qingshi_about_me', 'qingshi_where',
   'qingshi_find_experience', 'qingshi_record', 'qingshi_profile', 'qingshi_set_privacy',
   'qingshi_draft', 'qingshi_publish', 'qingshi_ui_read', 'qingshi_ui_goto',
   'qingshi_ui_click', 'qingshi_ui_type', 'qingshi_ui_tap', 'qingshi_ui_shot',
@@ -35,7 +35,7 @@ check('导出 inject', Array.isArray(mod.inject) && mod.inject.includes('tools')
 
 await mod.apply(ctx, { openLoginWindow: false, autoOpenBrowser: false, workspaceDir: process.env.QINGSHI_TEST_WORKSPACE || './.tmp-test-workspace' })
 
-check('工具数量 30', registered.size === 30, '实际 ' + registered.size)
+check('工具数量 31', registered.size === 31, '实际 ' + registered.size)
 for (const name of TOOL_NAMES) check('注册 ' + name, registered.has(name))
 
 for (const [name, tool] of registered) {

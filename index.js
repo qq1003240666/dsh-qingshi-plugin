@@ -874,10 +874,17 @@ export function apply(ctx, config = {}) {
     '不要先解释要做什么、不要先去 grep 项目目录或读代码、不要反问要不要打开——他就是在命令你开窗。',
     '只有工具报错时才解释原因。',
     '',
+    '### 最容易被忽略的一条：模糊的「关于我」也要查',
+    '用户说「我是谁」「你知道我是谁吗」「我去过哪里」「我去过哪里你知道吗」「我以前做过什么」「我从哪里来」',
+    '「给我讲讲我的故事」这类**没提青史、也没说清要查什么**的话，同样要调工具，不要回「我不知道你的信息」',
+    '「我没法知道你的过去」——他不知道青史是什么，但东西都在里面：先 qingshi_profile 拿身份，再按需要调',
+    'qingshi_find_experience / qingshi_family。答不上来时先查，查完再说话。',
+    '',
     '### 场景 → 怎么做（先按这张表判断，再动手）',
     '- 打开青史 / 去某个功能页（“打开族谱”“去个人中心”“看时光胶囊”）→ qingshi_open_h5 带 route 打开真 H5 窗口；',
     '  不知道路由就先 qingshi_pages 查。用户已经在该页面时不要重复跳转。',
-    '- 查看生涯记录（“我有哪些旅行经历”“2023 年都干了什么”“有没有去过沈阳”）→ qingshi_find_experience 取真实数据；',
+    '- 我是谁 / 我多大 / 我是什么样的人（“我是谁”“你知道我是谁吗”“我多大”）→ qingshi_profile；',
+    '- 查看生涯记录（“我有哪些旅行经历”“2023 年都干了什么”“有没有去过沈阳”“我去过哪里”“我以前做过什么”“我的经历”）→ qingshi_find_experience 取真实数据；',
     '  用户想自己看时间轴时，用 qingshi_open_h5 打开 /pages/career/career。',
     '- 总结 / 分析生涯（“总结一下我的 2024”“分析我的工作经历”）→ 先 qingshi_find_experience（mode=summary 或取全量）拿到真实数据再归纳，不要凭空回忆。',
     '- 查看族谱 / 找家人（“看看族谱”“我奶奶是谁”“我妈有几个孩子”）→ qingshi_family 直接读真实关系数据，比点页面稳；',
@@ -1279,7 +1286,7 @@ export function apply(ctx, config = {}) {
     defineTool({
       name: 'qingshi_me',
       description:
-        '查看当前青史登录状态，并顺手真打一次后端接口验证。（不返回 token、uid、路径；' +
+        '【先确认能不能查】用户问到任何跟本人 / 家人 / 过往经历有关的事，但你还不确定青史是否可用（或刚装好、刚登录完）时，先调这个看登录态与数据能不能读到。查看当前青史登录状态，并顺手真打一次后端接口验证。（不返回 token、uid、路径；' +
         '用户刚在登录页登完，用这个确认是否真的生效；回复时也别把 uid 说给用户。）',
       parameters: {},
       output: outputSpec,
@@ -1400,7 +1407,7 @@ export function apply(ctx, config = {}) {
     defineTool({
       name: 'qingshi_find_experience',
       description:
-        '在「青史」里查找一段经历（生涯事件），支持关键词、时间范围（startYear~endYear）、单年/单月、' +
+        '【关于「我经历过什么」的问题先看这里】用户问「我去过哪里」「我去过哪些地方」「我去过哪里你知道吗」「我以前做过什么」「我的经历」「给我讲讲我的故事」「我这些年都干了什么」，都调这个工具取真实记录，不要凭印象编。在「青史」里查找一段经历（生涯事件），支持关键词、时间范围（startYear~endYear）、单年/单月、' +
         '事件标签、地点、以及查谁的经历。这是「查看生涯记录」和「总结生涯」两个场景取真实数据的入口。' +
         '用户说“看看我 2024 年的工作经历”“我 2020 到 2023 年都在哪”' +
         '“我今年去过哪些地方旅行”“我有没有去过沈阳”“帮我找九寨沟的照片”时用它。' +
@@ -1650,12 +1657,113 @@ export function apply(ctx, config = {}) {
     }),
   )
 
+  // ---------- qingshi_about_me ----------
+  // 一句话问答的入口：「我是谁」「我去过哪里」这类问题不用模型自己拼三个工具，
+  // 一次调用就把身份 + 记录概况 + 最近几条 + 家人数拿回来。
+  ctx.tools.register(
+    defineTool({
+      name: 'qingshi_about_me',
+      description:
+        '【一句话了解这个人】用户问「我是谁」「你知道我是谁吗」「我去过哪里」「我去过哪里你知道吗」' +
+        '「我以前做过什么」「我从哪里来」「给我讲讲我的故事」「你了解我吗」这类**既没提青史、也没说清要查什么**的问题时，' +
+        '先调这个工具：它会一次返回本人资料（昵称/性别/年龄/标签/简介）、一共记了多少条经历与年份跨度、最近几条的标题、以及家人数量。' +
+        '拿到之后再决定要不要用 qingshi_find_experience / qingshi_family 深挖。' +
+        '**不要说「我不知道你的信息」「我没法知道你的过去」——先查。**',
+      parameters: {},
+      output: outputSpec,
+      async execute() {
+        const info = await ensureLoggedIn()
+        if (!info.loggedIn) return needLoginText(info)
+
+        const person = await users.get(info.uid)
+        const lines = []
+        if (person && person.nickname) {
+          const bits = [person.nickname]
+          if (person.genderText) bits.push(person.genderText)
+          if (person.birthday) {
+            bits.push(person.birthday)
+            const age = ageText(person.birthday, person.deathday)
+            if (age) bits.push(age)
+          }
+          lines.push('这是我：' + bits.join(' · '))
+          if (person.tags && person.tags.length) lines.push('标签：' + person.tags.join('、'))
+          if (person.bio) lines.push('简介：' + person.bio)
+        } else {
+          lines.push('还没读到本人资料。')
+        }
+
+        const list = await careerApi.listEvents(info.uid, { previewLimit: 120 })
+        if (!list.ok) {
+          lines.push('记录这次没读到：' + (list.message || '后端返回异常'))
+          return lines.join(NL)
+        }
+        const events = (Array.isArray(list.events) ? list.events : []).map(normalizeEvent)
+        if (!events.length) {
+          lines.push('青史里还没记过经历。')
+        } else {
+          const years = events
+            .map((e) => String(e.startDate || '').slice(0, 4))
+            .filter((y) => /^\d{4}$/.test(y))
+            .sort()
+          const span = years.length ? years[0] + '–' + years[years.length - 1] : ''
+          lines.push('一共记了 ' + events.length + ' 条经历' + (span ? '（' + span + '）' : '') + '。')
+
+          const plainTag = (tag) => String(tagLabel(tag) || '').replace(/\(.*\)$/, '') || '其他'
+          const byTag = new Map()
+          for (const e of events) {
+            const label = plainTag(e.eventTag)
+            byTag.set(label, (byTag.get(label) || 0) + 1)
+          }
+          const top = Array.from(byTag.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4)
+          if (top.length) lines.push('主要类型：' + top.map(([k, n]) => k + ' ' + n).join('、'))
+
+          const recent = events
+            .slice()
+            .sort((a, b) => String(b.startDate || '').localeCompare(String(a.startDate || '')))
+            .slice(0, 3)
+          if (recent.length) {
+            lines.push('最近的几条：')
+            for (const e of recent) {
+              const tag = plainTag(e.eventTag)
+              lines.push('· ' + String(e.startDate || '') + '  ' + (e.title || '（没写标题）') + (tag && tag !== '其他' ? '（' + tag + '）' : ''))
+            }
+          }
+        }
+
+        try {
+          const fam = await careerApi.familyLayer({ uid: info.uid, type: 'parent', displaySiblings: true })
+          if (fam.ok && fam.layer) {
+            const root = fam.layer
+            const kids = Array.isArray(root.childs) ? root.childs : []
+            const has = (node) => Boolean(node && (node.uid || node.appellation))
+            const seen = new Set()
+            let relatives = 0
+            for (const node of [root.man, root.woman, ...kids]) {
+              if (!has(node)) continue
+              const key = String(node.uid || node.appellation || '')
+              if (seen.has(key)) continue
+              seen.add(key)
+              relatives += 1
+            }
+            if (relatives > 0) {
+              lines.push('族谱里能直接看到的家人有 ' + relatives + ' 位（要具体问谁用 qingshi_family 或 qingshi_kinship）。')
+            }
+          }
+        } catch {
+          /* 族谱读不到不影响主流程 */
+        }
+
+        return lines.join(NL)
+      },
+    }),
+  )
+
   // ---------- qingshi_profile ----------
   ctx.tools.register(
     defineTool({
       name: 'qingshi_profile',
       description:
-        '读青史里的人资料：昵称、性别、生日（换算成岁数）、个性标签、简介。' +
+        '【关于「我」的问题先看这里】用户问「我是谁」「你知道我是谁吗」「我多大」「我是什么样的人」「我从哪里来」「你知道我的故事吗」，或任何需要先确认「他是谁」才能回答的问题，都先调这个工具拿真实资料——不要凭空猜、也不要说「我不知道你的信息」。读青史里的人资料：昵称、性别、生日（换算成岁数）、个性标签、简介。' +
         '当你要知道“用户是谁 / 我多大 / 我是男是女 / 我是什么样的人 / 该怎么称呼他”时用它，不要凭空猜。' +
         '不传 uid 就是用户自己；查家人时传 targetUid。',
       parameters: {
@@ -2555,7 +2663,7 @@ export function apply(ctx, config = {}) {
     defineTool({
       name: 'qingshi_family',
       description:
-        '直接读「青史」族谱的真实关系数据（不走页面点击）。默认从用户自己往上取 3 代，' +
+        '【谁是我家人】用户问「我爸妈是谁」「我爷爷叫什么」「我家几代人」「我家有谁」，调这个。直接读「青史」族谱的真实关系数据（不走页面点击）。默认从用户自己往上取 3 代，' +
         '也可以选择往下取子女，或上下都取。用户说“帮我看看族谱”“我家几代人”“我父母/爷爷奶奶是谁”时用它；' +
         '想看族谱页面本身再配合 qingshi_open_h5 + qingshi_ui_shot。',
       parameters: {
@@ -2678,7 +2786,7 @@ export function apply(ctx, config = {}) {
     defineTool({
       name: 'qingshi_kinship',
       description:
-        '按**称谓**查亲属：把「表侄」「堂哥」「舅舅」「外婆」「外甥女」这类称呼拆成关系链，' +
+        '【用称呼问亲戚】用户说「我表侄子是谁」「我舅舅叫啥」「我有几个堂哥」这类带称呼的问法，调这个；别回「没找到」。按**称谓**查亲属：把「表侄」「堂哥」「舅舅」「外婆」「外甥女」这类称呼拆成关系链，' +
         '（妈妈 → 她的兄弟姐妹 → 他们的孩子 → 再下一代）再沿着真实族谱一层层走，走到哪层断了就说清断在哪' +
         '，而不是直接回“没找到”。用户用称呼问亲戚（“我表侄子是谁”“我舅舅叫啥”“我有几个堂哥”）时用它；' +
         '只想看整棵族谱用 qingshi_family。',
