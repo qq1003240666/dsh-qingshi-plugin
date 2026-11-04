@@ -107,7 +107,7 @@ codex mcp add qingshi --command node --args /绝对路径/dsh-qingshi-plugin/bin
 
 | 现象 | 怎么办 |
 | --- | --- |
-| 提示没登录 / 登录过期 | 让它打开青史，会弹出一个小登录窗，用小程序绑定的手机号登一次即可，之后不用重复登 |
+| 提示没登录 / 登录过期 | 能弹窗的机器（有 Electron 或 Chrome/Edge）会弹一个小登录窗；不能弹窗的（MCP、远程、无浏览器）会自动改成短信验证码：给它手机号 → 收短信 → 把 6 位码发它。两条路都只登一次 |
 | 窗口打不开 | 装 Electron（`cd shell && npm install`），或把 `windowMode` 改成 `app` 走系统浏览器 |
 | 改了代码没生效 | 插件只在 Harness 启动时加载，完全退出再打开 |
 

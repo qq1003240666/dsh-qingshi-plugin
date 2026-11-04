@@ -16,7 +16,13 @@ node <包目录>/bin/qingshi-mcp.mjs
 ```
 
 不需要安装任何依赖（包本身 `dependencies` 是空的），Node >= 22.4 即可。
-第一次调用工具会发现没登录，此时让 AI 调 `qingshi_login`，它会弹出一个小登录窗。
+
+**登录**：MCP 客户端里通常没有可弹的窗口，所以 `qingshi_login` 会自动走短信验证码：
+
+1. 把手机号交给它：`qingshi_login({"phone":"13800000000"})` → 会收到一条短信
+2. 把 6 位验证码交给它：`qingshi_login({"code":"123456"})` → 登录完成、凭证存到本机
+
+如果那台机器装了 Electron 或 Chrome/Edge，直接 `qingshi_login()` 会弹登录窗，效果一样。
 
 ---
 

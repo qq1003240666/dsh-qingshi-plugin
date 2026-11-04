@@ -58,6 +58,17 @@ const meText = me.result?.content?.[0]?.text || ''
 check('qingshi_me 未登录不抛异常', me.result?.isError === false, meText.slice(0, 60))
 check('qingshi_me 提示要登录', /登录/.test(meText), meText.slice(0, 60))
 
+console.log('— 无窗口登录（短信验证码）')
+const badPhone = await server.handle({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'qingshi_login', arguments: { phone: '123' } } })
+check('手机号格式错误会拦下来', /手机号看着不太对/.test(badPhone.result?.content?.[0]?.text || ''), (badPhone.result?.content?.[0]?.text || '').slice(0, 40))
+
+const codeOnly = await server.handle({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'qingshi_login', arguments: { code: '123456' } } })
+check('没发码就交码会提示先发码', /先用手机号发一次验证码/.test(codeOnly.result?.content?.[0]?.text || ''), (codeOnly.result?.content?.[0]?.text || '').slice(0, 40))
+
+const noArgs = await server.handle({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'qingshi_login', arguments: {} } })
+const noArgsText = noArgs.result?.content?.[0]?.text || ''
+check('无窗口时不弹窗、改说短信流程', /没有可用的窗口/.test(noArgsText) && /phone/.test(noArgsText), noArgsText.slice(0, 60))
+
 const bad = await server.handle({ jsonrpc: '2.0', id: 5, method: 'nope/nope' })
 check('未知方法返回 -32601', bad?.error?.code === -32601, JSON.stringify(bad?.error))
 

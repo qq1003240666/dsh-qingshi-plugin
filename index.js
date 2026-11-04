@@ -20,7 +20,7 @@ import { createRequest } from './lib/request.js'
 import { createDraftStore } from './lib/drafts.js'
 import { createUploader } from './lib/upload.js'
 import { launchApp, attach, findBrowser } from './lib/browser.js'
-import { launchShell } from './lib/electron-shell.js'
+import { launchShell, findElectron } from './lib/electron-shell.js'
 import { startLoginServer } from './lib/login-server.js'
 import { openInWindow } from './lib/open-browser.js'
 import { PAGES, findPages, pageUrl, pageBrief } from './lib/pages-map.js'
@@ -502,6 +502,45 @@ export function apply(ctx, config = {}) {
    * 弹「插件自己的」登录小窗，等用户登完，凭证自动落盘。返回 {ok, uid, message}。
    * 这是全插件唯一的登录入口：qingshi_login 和 ensureLoggedIn 都走它。
    */
+  // 这台机器能不能弹窗：有 Electron 外壳，或者有可用的 Chrome/Edge。
+  function canOpenWindow() {
+    try {
+      if (findElectron()) return true
+    } catch {
+      /* 探不到就当没有 */
+    }
+    try {
+      if (findBrowser()) return true
+    } catch {
+      /* 同上 */
+    }
+    return false
+  }
+
+  // 文字登录（MCP / 远程环境）：短信发送后把手机号记在这里，等用户回一条验证码。
+  const pendingLogin = { phone: '', sentAt: 0, ttlMs: 10 * 60 * 1000 }
+
+  function maskPhone(phone) {
+    const text = String(phone || '')
+    if (text.length < 7) return text
+    return text.slice(0, 3) + '****' + text.slice(-4)
+  }
+
+  function pendingValid() {
+    return Boolean(pendingLogin.phone) && Date.now() - pendingLogin.sentAt < pendingLogin.ttlMs
+  }
+
+  // 未登录时给模型的话术：能弹窗就说弹窗，不能弹窗就引导它去要手机号和验证码。
+  function needLoginText(info) {
+    if (info && info.phoneFlow) {
+      return [
+        '还没登录青史（这台机器没有可用的窗口，走短信验证码登录）。',
+        '先问用户的手机号，调 qingshi_login 传 phone；用户收到短信后，把 6 位验证码传 code，就能登进去。',
+      ].join(NL)
+    }
+    return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+  }
+
   async function openLoginWindowAndWait({ waitSeconds = 120, reason = '' } = {}) {
     const seconds = Number(waitSeconds) > 0 ? Number(waitSeconds) : 120
     const server = await startLoginServer({
@@ -587,13 +626,16 @@ export function apply(ctx, config = {}) {
       info = { loggedIn: false, uid: '' }
     }
 
-    if (!allowLogin || !cfg.openLoginWindow) {
-      return { loggedIn: false, uid: '', needLogin: true }
+    const windowable = cfg.openLoginWindow && canOpenWindow()
+
+    if (!allowLogin || !windowable) {
+      // 不能弹窗（MCP、远程、无浏览器）：走文字登录，让模型去要手机号和验证码
+      return { loggedIn: false, uid: '', needLogin: true, phoneFlow: !windowable }
     }
 
     const result = await openLoginWindowAndWait({ waitSeconds: 120, reason: '登录已过期' })
     if (!result.ok) {
-      return { loggedIn: false, uid: '', needLogin: true, loginMessage: result.message }
+      return { loggedIn: false, uid: '', needLogin: true, phoneFlow: true, loginMessage: result.message }
     }
     const next = await workspace.info()
     return { ...next, validated: true }
@@ -865,6 +907,9 @@ export function apply(ctx, config = {}) {
     '  用户在窗里输手机号 + 验证码，登完凭证自动写到固定位置（工作区的 auth.json），下次直接用。',
     '- 所以**不要**给「我已登录，保存凭证」这类按钮，**不要**让用户去小程序/H5 登录页手动登录，也别说“请先登录”。',
     '- 只有工具真的返回「登录窗口没等到完成」时，才把那个本机地址告诉用户、让他登完再说一声。',
+    '- **没有窗口的环境（MCP、远程、无浏览器的机器）走短信验证码**：工具会说“这台机器没有可用的窗口”，',
+    '  这时先问用户的手机号 → 调 qingshi_login 传 phone（发短信）→ 用户把 6 位码告诉你 → 再调 qingshi_login 传 code。',
+    '  两条路都别让用户去小程序或 H5 登录页，也别把手机号、验证码写进回复里（手机号可以说后四位）。',
     '- qingshi_save_login 只是兜底（用户在青史窗口里自己登过、想让插件读取时），默认不要主动调。',
     '' ,
     '### 别把钱烧在来回读页面上',
@@ -1033,18 +1078,25 @@ export function apply(ctx, config = {}) {
     defineTool({
       name: 'qingshi_login',
       description:
-        '登录青史。会弹出一个插件自己的登录窗口（本机 127.0.0.1 上的页面，不是网页版），' +
-        '用户在里面输手机号 + 验证码；登录成功后凭证自动存到本机并注入青史窗口，' +
-        '不需要用户再回对话里确认。凭证还有效时直接报已登录（除非传 force）。',
+        '登录青史。能弹窗的机器（有 Electron 或 Chrome/Edge）会弹一个插件自己的登录窗口，' +
+        '用户在里面输手机号 + 验证码，登完自动保存凭证、自动关窗。' +
+        '不能弹窗的机器（MCP、远程、无浏览器）走短信验证码：先传 phone 发码，' +
+        '用户把收到的 6 位码告诉你，再传 code 完成登录。凭证还有效时直接报已登录（除非传 force）。',
       parameters: {
+        phone: { type: 'string', description: '手机号（无窗口时用：传它就发验证码）' },
+        code: { type: 'string', description: '短信里的 6 位验证码（无窗口时用：传它完成登录）' },
         force: { type: 'boolean', description: '有凭证也强制重新登录，默认 false' },
-        waitSeconds: { type: 'number', description: '最多等用户多久，默认 120 秒' },
+        waitSeconds: { type: 'number', description: '窗口登录最多等多久，默认 120 秒' },
       },
       output: outputSpec,
       async execute(args) {
         const info = await workspace.info()
-        if (args?.force && info.loggedIn) await workspace.clear()
-        if (!args?.force && info.loggedIn) {
+        const force = args?.force === true
+        const phone = String(args?.phone || '').trim()
+        const code = String(args?.code || '').trim()
+
+        if (force && info.loggedIn) await workspace.clear()
+        if (!force && info.loggedIn) {
           const probe = await authed('/get_career_list', { of_type: 'user', of_id: info.uid, content_preview_limit: 1 })
           if (probe.code === 200) {
             const raw = probe.event_list || probe.career_list || []
@@ -1055,9 +1107,81 @@ export function apply(ctx, config = {}) {
           }
         }
 
+        // ---------- 文字登录：给验证码就完成登录 ----------
+        if (code) {
+          const target = phone || (pendingValid() ? pendingLogin.phone : '')
+          if (!target) {
+            return [
+              '要先用手机号发一次验证码：把用户的手机号传给 qingshi_login 的 phone 参数。',
+              '拿到验证码后再传 code。',
+            ].join(NL)
+          }
+          try {
+            const { uid } = await submitLogin(target, code)
+            pendingLogin.phone = ''
+            pendingLogin.sentAt = 0
+            try {
+              const opened = await ensureBrowser('/pages/career/career')
+              if (!opened.error) await hydrateBrowserAuth(opened.session)
+            } catch (error) {
+              ctx.logger?.debug?.('登录后同步窗口失败：' + (error?.message || String(error)))
+            }
+            let count = 0
+            try {
+              const probe = await authed('/get_career_list', { of_type: 'user', of_id: uid, content_preview_limit: 1 })
+              if (probe.code === 200) {
+                const raw = probe.event_list || probe.career_list || []
+                count = Array.isArray(raw) ? raw.length : 0
+              }
+            } catch {
+              /* 数不到就数不到 */
+            }
+            return [
+              '登录成功，凭证已经存在本机（' + maskPhone(target) + '）。',
+              '现在能读到 ' + count + ' 条记录，之后不用再登。',
+            ].join(NL)
+          } catch (error) {
+            return [
+              '验证码没通过：' + (error?.message || String(error)),
+              '可以让用户看一眼短信再试一次；要重发就说一声，我再发一条。',
+            ].join(NL)
+          }
+        }
+
+        // ---------- 文字登录：给手机号就发验证码 ----------
+        if (phone) {
+          if (!/^1[3-9]\d{9}$/.test(phone)) return '手机号看着不太对，要 11 位、以 1 开头。再确认一下？'
+          try {
+            await sendLoginCode(phone)
+          } catch (error) {
+            return '短信没发出去：' + (error?.message || String(error))
+          }
+          pendingLogin.phone = phone
+          pendingLogin.sentAt = Date.now()
+          return [
+            '验证码已经发到 ' + maskPhone(phone) + ' 了（10 分钟内有效）。',
+            '让用户把收到的 6 位数字发给你，再调 qingshi_login 传 code 就能登进去。',
+          ].join(NL)
+        }
+
+        // ---------- 没参数：能弹窗就弹窗，不能就引导文字登录 ----------
+        if (!cfg.openLoginWindow || !canOpenWindow()) {
+          return [
+            '这台机器上没有可用的窗口（没装 Electron，也没找到 Chrome/Edge），改成短信验证码登录：',
+            '第 1 步：问用户的手机号，然后调 qingshi_login 传 phone（会发一条短信）。',
+            '第 2 步：用户把收到的 6 位验证码告诉你，再调 qingshi_login 传 code。',
+            '两步都做完凭证会存到本机，之后不用再登。',
+          ].join(NL)
+        }
+
         const waitSeconds = Number(args?.waitSeconds) > 0 ? Number(args.waitSeconds) : 120
         const result = await openLoginWindowAndWait({ waitSeconds, reason: '手动登录' })
-        if (!result.ok) return result.message
+        if (!result.ok) {
+          return [
+            result.message,
+            '如果这台机器打不开窗口，也可以改用文字登录：先传 phone 发验证码，再传 code 完成登录。',
+          ].join(NL)
+        }
         const hydrated = '已同步到青史窗口，直接就是登录态。'
 
         let count = 0
@@ -1178,7 +1302,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
 
         const targetUid = String(args?.targetUid || info.uid || '').trim()
         const result = await authed('/get_career_list', {
@@ -1273,7 +1397,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
 
         const targetUid = String(args?.targetUid || info.uid || '').trim()
         const query = String(args?.query || '').trim()
@@ -1433,7 +1557,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
 
         const title = String(args?.title || '').trim()
         const content = String(args?.content || '').trim()
@@ -1502,7 +1626,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
 
         const uid = String(args?.targetUid || '').trim() || info.uid
         const person = await users.get(uid, { force: Boolean(args?.refresh) })
@@ -1546,7 +1670,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
 
         const eventId = String(args?.eventId || '').trim()
         if (!eventId) return '缺少 eventId（要改哪一条？可以先用 qingshi_find_experience 查出来）。'
@@ -1909,7 +2033,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
         const eventId = String(args?.eventId || '').trim()
         if (!eventId) return '缺少 eventId。'
         const found = await careerApi.getEvent(eventId)
@@ -1969,7 +2093,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
         const eventId = String(args?.eventId || '').trim()
         if (!eventId) return '缺少 eventId。'
         const patch = {}
@@ -2017,7 +2141,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
         const eventId = String(args?.eventId || '').trim()
         if (!eventId) return '缺少 eventId。'
         const found = await careerApi.getEvent(eventId)
@@ -2407,7 +2531,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
         const startUid = String(args?.targetUid || info.uid || '').trim()
         if (!startUid) return '拿不到 uid，先调用 qingshi_me 看看登录状态。'
         const rawDirection = String(args?.direction || 'all').toLowerCase()
@@ -2526,7 +2650,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute(args) {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) return '登录已过期，我这边会弹一个小登录窗，你在里面用手机号登一次就行，登完自动接上（不用去小程序、也不用点任何按钮）。'
+        if (!info.loggedIn) return needLoginText(info)
         const startUid = String(args?.targetUid || info.uid || '').trim()
         const rawTerm = String(args?.term || '').trim()
         if (!rawTerm) return '要查哪个称呼？比如「表侄」「舅舅」「外婆」。'
