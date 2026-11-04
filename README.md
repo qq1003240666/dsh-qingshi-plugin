@@ -80,6 +80,12 @@ codex mcp add qingshi --command node --args /绝对路径/dsh-qingshi-plugin/bin
 
 ---
 
+## 在别的 AI 里怎么用
+
+Claude Code、Codex、Cursor、Cline、workbuddy 都能接——它是标准 MCP server（stdio）。
+装法和「怎么让它真的去查青史」写在 [docs/USE-IN-OTHER-APPS.md](docs/USE-IN-OTHER-APPS.md)：
+包括一条命令接入、可粘贴到 `AGENTS.md` / `CLAUDE.md` 的规则片段、以及为什么 MCP 没有「唤醒词」。
+
 ## 前置条件
 
 | 条件 | 说明 |
