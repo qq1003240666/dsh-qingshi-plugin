@@ -42,7 +42,7 @@ check('ping 有 result', pinged?.id === 99 && 'result' in (pinged || {}))
 console.log('— 工具清单')
 const list = await server.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
 const items = list.result?.tools || []
-check('29 个工具', items.length === 29, String(items.length))
+check('30 个工具', items.length === 30, String(items.length))
 check('每个都有 name/description/inputSchema', items.every((t) => t.name && t.description && t.inputSchema))
 check('inputSchema 是 object', items.every((t) => t.inputSchema?.type === 'object'))
 check('qingshi_kinship 有 term 参数', Boolean(items.find((t) => t.name === 'qingshi_kinship')?.inputSchema?.properties?.term))

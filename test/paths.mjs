@@ -65,6 +65,32 @@ writeFileSync(join(target, 'auth.json'), JSON.stringify({ uid: 'newer' }))
 migrateLegacy(target)
 check('已有文件不会被老数据覆盖', JSON.parse(readFileSync(join(target, 'auth.json'), 'utf8')).uid === 'newer')
 
+// ---- 目录不可写时的回退（其他 AI 客户端常把用户目录锁住）----
+{
+  const { pickHomeDir, isWritableDir, cwdFallbackDir } = await import('../lib/paths.js')
+  const prevAppData = process.env.APPDATA
+  const prevHome = process.env.QINGSHI_HOME
+  const prevWs = process.env.QINGSHI_WORKSPACE
+  delete process.env.QINGSHI_HOME
+  delete process.env.QINGSHI_WORKSPACE
+
+  // 把 APPDATA 指到一个「父级是文件」的路径，mkdir 必然失败 → 应该退到当前目录
+  process.env.APPDATA = 'C:/Windows/System32/drivers/etc/hosts'
+  const blocked = pickHomeDir({})
+  check('平台目录写不进去时退到当前目录', blocked.source === 'cwd', JSON.stringify(blocked))
+  check('退到的目录确实可写', isWritableDir(blocked.dir), blocked.dir)
+  check('退到的目录就是 .qingshi', blocked.dir === cwdFallbackDir(), blocked.dir)
+
+  // 显式指定优先，不受可写性探测影响
+  const forced = pickHomeDir({ workspaceDir: join(sandbox, 'forced') })
+  check('显式配置优先', forced.source === 'config' && forced.dir === join(sandbox, 'forced'), JSON.stringify(forced))
+
+  if (prevAppData === undefined) delete process.env.APPDATA
+  else process.env.APPDATA = prevAppData
+  if (prevHome !== undefined) process.env.QINGSHI_HOME = prevHome
+  if (prevWs !== undefined) process.env.QINGSHI_WORKSPACE = prevWs
+}
+
 if (prevDsh === undefined) delete process.env.DSH_HOME
 else process.env.DSH_HOME = prevDsh
 rmSync(sandbox, { recursive: true, force: true })

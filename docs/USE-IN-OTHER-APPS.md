@@ -87,6 +87,10 @@ tool_timeout_sec = 180        # 登录要等短信，别用默认 60
 `%APPDATA%\qingshi\auth.json`（macOS 是 `~/Library/Application Support/qingshi/auth.json`），
 DSH 里登过一次，这里就不用再登——两边共用同一份。
 
+**如果这个客户端不让写用户目录**（报 `EPERM: operation not permitted, open ...auth.json`），
+插件会自动改用「当前工作目录下的 `.qingshi/`」。想自己指定就设 `QINGSHI_HOME=D:\my-data\qingshi`。
+拿不准时问一句「青史的凭证存在哪」，它会调 `qingshi_where` 报出实际目录、是否可写、里面有哪些文件。
+
 ## 会 / 不会被问住的场景
 
 | 能直接用（纯接口） | 需要本机桌面窗口 |

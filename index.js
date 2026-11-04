@@ -16,7 +16,7 @@ try {
   // 非 DSH 环境：保持恒等实现
 }
 import { createWorkspace } from './lib/workspace.js'
-import { resolveHomeDir, migrateLegacy, shouldMigrate } from './lib/paths.js'
+import { pickHomeDir, describeHomeDir, migrateLegacy, shouldMigrate } from './lib/paths.js'
 import { createRequest } from './lib/request.js'
 import { createDraftStore } from './lib/drafts.js'
 import { createUploader } from './lib/upload.js'
@@ -191,7 +191,8 @@ function eventText(item) {
 export function apply(ctx, config = {}) {
   // 数据目录：显式配置 > QINGSHI_HOME > 平台默认（Windows 是 %APPDATA%\qingshi）。
   // 老版本放在 ~/.dsh/qingshi-workspace 或当前目录，这里一次性搬过来，登录态不用重来。
-  const dataDir = resolveHomeDir(config)
+  const picked = pickHomeDir(config)
+  const dataDir = picked.dir
   if (shouldMigrate(config)) migrateLegacy(dataDir)
   const cfg = {
     apiBaseUrl: String(config.apiBaseUrl || 'https://api.iyouwc.cn').replace(/\/+$/, ''),
@@ -1235,6 +1236,41 @@ export function apply(ctx, config = {}) {
         return (
           '凭证已保存（云端 ' + (synced.count || 0) + ' 条记录能读到）。以后打开窗口直接就是登录态，不用再登。'
         )
+      },
+    }),
+  )
+
+  ctx.tools.register(
+    defineTool({
+      name: 'qingshi_where',
+      description:
+        '报告青史的数据存在这台机器的哪个目录、能不能写、里面已经有哪些文件。' +
+        '用户在别的 AI 客户端里遇到「EPERM / 不让写」、或者问「我的登录凭证存哪了」时用它。',
+      parameters: {},
+      output: outputSpec,
+      async execute() {
+        const info = describeHomeDir(config)
+        const why = {
+          config: '插件配置里指定的目录',
+          env: '环境变量 QINGSHI_HOME',
+          platform: '系统默认位置（AppData / Application Support / XDG）',
+          cwd: '系统默认位置不可写，退到了当前工作目录',
+          tmp: '默认位置和当前目录都不可写，退到了系统临时目录（重启可能被清）',
+        }[info.source] || info.source
+        const lines = [
+          '数据目录：' + info.dir,
+          '为什么在这里：' + why,
+          '能写吗：' + (info.writable ? '能' : '不能（这个环境把这个目录锁住了）'),
+        ]
+        if (info.files.length) lines.push('已有的文件：' + info.files.join('、'))
+        else lines.push('已有的文件：还没有（第一次用）')
+        if (!info.writable) {
+          lines.push(
+            '办法：把 QINGSHI_HOME 指到一个能写的地方再重开客户端，比如 QINGSHI_HOME=' +
+              join(process.cwd(), '.' + 'qingshi'),
+          )
+        }
+        return lines.join(NL)
       },
     }),
   )

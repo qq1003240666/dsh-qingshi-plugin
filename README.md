@@ -132,7 +132,15 @@ Claude Code、Codex、Cursor、Cline、workbuddy 都能接——它是标准 MCP
 | `electron-profile/`、`browser-profile/` | 窗口自己的浏览器配置（登录态、缓存） |
 | `shots/` | 截图 |
 
-想换地方：设环境变量 `QINGSHI_HOME=/some/dir`，或在插件配置里写 `workspaceDir`（MCP 里是 `QINGSHI_WORKSPACE`）。
+**如果这个环境不让写用户目录**（有些 AI 客户端会锁住 `%APPDATA%`，报 `EPERM: operation not permitted`），
+插件会自动退到当前工作目录下的 `.qingshi/`；再不行退到系统临时目录。想固定下来就设：
+
+```bash
+QINGSHI_HOME=D:\my-data\qingshi      # 任意可写目录，优先级最高
+```
+
+优先级：插件配置 `workspaceDir`（MCP 是 `QINGSHI_WORKSPACE`）> `QINGSHI_HOME` > 平台默认 > 当前目录 `.qingshi` > 临时目录。
+不确定现在用的是哪个、能不能写，直接问 AI「青史的凭证存在哪」——它会调 `qingshi_where` 告诉你实际路径。
 老版本存在 `~/.dsh/qingshi-workspace` 或当前目录的，第一次运行会自动搬过来，登录态不会丢。
 
 ---
