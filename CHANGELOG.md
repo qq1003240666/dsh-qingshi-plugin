@@ -6,6 +6,13 @@
 - **minor**：新增工具、新增页面/窗口形态、新增配置项
 - **patch**：修 bug、改提示词、调样式、改文档
 
+## 0.16.0
+
+- 新增：`mcp/server.mjs` + `bin/qingshi-mcp.mjs`——同一个包同时是 **MCP server**，Codex / Claude Code / Cursor / Cline 等任何 MCP 客户端都能接，29 个工具原样暴露
+- 新增：`docs/MCP.md`（各客户端配置、环境变量、工具分组、自检）
+- 改动：`index.js` 的 `defineTool` 改成动态导入 + 恒等兜底，没有 `@deepseek-ai/dsh-tools` 的环境也能跑
+- 测试：新增 `test/mcp.mjs`（20 条断言：协议、工具清单、未知工具/方法、未登录不抛异常），`npm test` 串跑两份
+
 ## 0.15.3
 
 - 文档：README 重写为中文精简版，只留「是干什么的 / 会怎么用 / 怎么装 / 前置条件 / 注意事项 / 常见问题」

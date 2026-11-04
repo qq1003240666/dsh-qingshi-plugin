@@ -7,7 +7,14 @@
 //   3. 请求层：复刻小程序端 utils/request.js 的 httpRequest，见 lib/request.js。
 //
 // 安全底线：access_token / refresh_token 绝不作为工具参数，也绝不写进工具输出。
-import { defineTool } from '@deepseek-ai/dsh-tools'
+// 宿主可以是 DSH（有 @deepseek-ai/dsh-tools），也可以是 MCP server 这种没有它的环境。
+// 没有就把 defineTool 退化成恒等函数：工具定义本来就只是一个普通对象。
+let defineTool = (spec) => spec
+try {
+  ;({ defineTool } = await import('@deepseek-ai/dsh-tools'))
+} catch {
+  // 非 DSH 环境：保持恒等实现
+}
 import { createWorkspace, defaultWorkspaceDir } from './lib/workspace.js'
 import { createRequest } from './lib/request.js'
 import { createDraftStore } from './lib/drafts.js'

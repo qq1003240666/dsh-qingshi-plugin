@@ -6,6 +6,8 @@
 它不是把数据导出成文件喂给 AI，而是**现场查你的青史账号**：问什么查什么，答案永远最新，
 你在小程序里改过的东西，它也看得到最新的。
 
+这个包同时是一个 **MCP server**——除了 DSH，Codex、Claude Code、Cursor 也能接上它（见下方「在别的 AI 里用」）。
+
 ![生涯时间轴](assets/screenshot-career.png)
 
 ---
@@ -44,6 +46,37 @@ dsh plugin add ./dsh-qingshi.tgz
 界面上也可以：**设置 → 插件管理器 → 安装**，粘贴上面的地址或本地文件路径。
 
 装完**完全退出 Harness（包括托盘图标）再打开**，插件只在启动时加载。
+
+---
+
+## 在别的 AI 里用（MCP）
+
+同一个包也是标准 MCP server，29 个工具原样暴露。装好之后让客户端用 stdio 拉起它：
+
+```sh
+node /绝对路径/dsh-qingshi-plugin/bin/qingshi-mcp.mjs
+```
+
+三个常见客户端的写法：
+
+```sh
+# Claude Code
+claude mcp add --transport stdio qingshi -- node /绝对路径/dsh-qingshi-plugin/bin/qingshi-mcp.mjs
+
+# Codex CLI
+codex mcp add qingshi --command node --args /绝对路径/dsh-qingshi-plugin/bin/qingshi-mcp.mjs
+```
+
+```json
+// Cursor ~/.cursor/mcp.json、Cline 设置里的 mcpServers 也是这个形状
+{
+  "mcpServers": {
+    "qingshi": { "command": "node", "args": ["/绝对路径/dsh-qingshi-plugin/bin/qingshi-mcp.mjs"] }
+  }
+}
+```
+
+不需要额外依赖。详细的环境变量、工具分组、排错见 [docs/MCP.md](docs/MCP.md)。
 
 ---
 

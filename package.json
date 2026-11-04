@@ -1,7 +1,7 @@
 {
   "name": "dsh-qingshi",
-  "version": "0.15.3",
-  "description": "Qingshi (青史) diary and family-tree assistant: reads and writes career records, resolves relatives by kinship term, and drives the real H5 pages in a desktop window.",
+  "version": "0.16.0",
+  "description": "青史（Qingshi）日记与族谱助手 —— DSH 插件，同时也是 MCP server，Codex / Claude Code / Cursor 等任何 MCP 客户端都能用。",
   "type": "module",
   "license": "MIT",
   "author": "qq1003240666",
@@ -19,7 +19,13 @@
     "deepseek-harness",
     "qingshi",
     "diary",
-    "family-tree"
+    "family-tree",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude-code",
+    "codex",
+    "cursor"
   ],
   "engines": {
     "node": ">=22.4.0"
@@ -49,7 +55,10 @@
     "CHANGELOG.md",
     "README.md",
     "LICENSE",
-    "test/*.mjs"
+    "test/*.mjs",
+    "mcp/",
+    "bin/qingshi-mcp.mjs",
+    "docs/MCP.md"
   ],
   "dsh": {
     "bundle": {
@@ -57,6 +66,9 @@
     }
   },
   "scripts": {
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs && node test/mcp.mjs"
+  },
+  "bin": {
+    "qingshi-mcp": "./bin/qingshi-mcp.mjs"
   }
 }
