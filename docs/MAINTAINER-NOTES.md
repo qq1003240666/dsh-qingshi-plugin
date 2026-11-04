@@ -508,3 +508,11 @@ node .tmp/qingshi-test2/run.mjs      # 153 passed, 0 failed
 ## 窗口生命周期
 
 插件启动的 Electron 外壳会拿到 `QINGSHI_PARENT_PID`，`shell/main.js` 每 2 秒探一次父进程，Harness 退出后窗�口自己关掉，不会留下孤儿进程。
+
+### MCP 侧必须自己转 inputSchema
+
+插件里的 `parameters` 用的是 DSH 的参数表写法（`{ phone: { type: 'string', required: true } }`），
+在 DSH 里由 `@deepseek-ai/dsh-tools` 转成 JSON Schema；MCP 这条路上没有它，
+所以 `mcp/server.mjs` 的 `toJsonSchema()` 必须自己转（`type: 'object'` + `properties` + `required` + 数组的 `items`）。
+不转的后果：客户端拿到 `{"phone": {...}}` 这种没有 `type` 的对象，workbuddy 这类严格客户端会直接拒绝连接。
+

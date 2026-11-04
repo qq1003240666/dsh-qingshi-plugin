@@ -6,6 +6,14 @@
 - **minor**：新增工具、新增页面/窗口形态、新增配置项
 - **patch**：修 bug、改提示词、调样式、改文档
 
+## 0.18.1
+
+- **修 MCP 工具的 inputSchema 不合法**：插件里写的是 DSH 的参数表（`{phone:{type:'string'}}`），
+  DSH 会帮你转成 JSON Schema，但走 MCP 时没人转，客户端拿到的是没有 `type` 的对象。
+  严格的客户端（workbuddy 等）会直接报 `tools[i].inputSchema.type 期望 object` 并拒绝连接。
+  现在 `mcp/server.mjs` 自己把参数表转成标准 JSON Schema（含 `properties` / `required` / `items`）。
+- `test/mcp.mjs` 补 7 条断言守住这条（每个工具 `type === 'object'`、`required` 都在 `properties` 里、数组参数带 `items`）
+
 ## 0.18.0
 
 - 统一数据目录：所有宿主（DSH 插件、MCP、Claude Code、Codex、命令行）共用一份

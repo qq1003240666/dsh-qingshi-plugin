@@ -77,11 +77,66 @@ export async function loadTools(config = envConfig()) {
   return { tools, entries, instructions }
 }
 
+// 插件里写的 parameters 是 DSH 的「参数表」形态：
+//     { phone: { type: 'string', description: '...' }, force: { type: 'boolean' } }
+// 而 MCP 要的是标准 JSON Schema：
+//     { type: 'object', properties: { phone: { type: 'string' } }, required: [...] }
+// 在 DSH 里这一步是 @deepseek-ai/dsh-tools 帮你做的；走 MCP 时没有它，
+// 所以必须在这里自己转——否则客户端拿到的是没有 type 的对象，
+// 严格的客户端（例如 workbuddy）会直接报 `tools[0].inputSchema.type 期望 object`。
+const JSON_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'null', 'array', 'object'])
+
+function dslPropertyToSchema(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return {}
+  if (Array.isArray(entry.oneOf)) return { oneOf: entry.oneOf.map(dslPropertyToSchema) }
+
+  const type = String(entry.type || '').toLowerCase()
+  const out = {}
+  // json = 任意值（对象/数组都行），不写 type
+  if (JSON_TYPES.has(type)) out.type = type
+  if (entry.description) out.description = String(entry.description)
+  if (Array.isArray(entry.enum)) out.enum = entry.enum.slice()
+  if (entry.default !== undefined) out.default = entry.default
+
+  if (type === 'array') out.items = dslPropertyToSchema(entry.items || {})
+  if (type === 'object') {
+    const inner = toJsonSchema(entry.properties || {})
+    out.properties = inner.properties
+    if (inner.required) out.required = inner.required
+  }
+  return out
+}
+
+/** 参数表 / 已经是 JSON Schema 的，都统一成 MCP 认的 JSON Schema。 */
+export function toJsonSchema(parameters) {
+  if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) {
+    return { type: 'object', properties: {} }
+  }
+  const declared = String(parameters.type || '').toLowerCase()
+  if (declared === 'object' && parameters.properties && typeof parameters.properties === 'object') {
+    const out = { type: 'object', properties: parameters.properties }
+    if (Array.isArray(parameters.required) && parameters.required.length) {
+      out.required = parameters.required.filter((name) => typeof name === 'string')
+    }
+    return out
+  }
+
+  const properties = {}
+  const required = []
+  for (const [name, entry] of Object.entries(parameters)) {
+    properties[name] = dslPropertyToSchema(entry)
+    if (entry && entry.required === true) required.push(name)
+  }
+  const schema = { type: 'object', properties }
+  if (required.length) schema.required = required
+  return schema
+}
+
 function toMcpTool(spec) {
   return {
     name: spec.name,
     description: String(spec.description || ''),
-    inputSchema: spec.parameters || { type: 'object', properties: {} },
+    inputSchema: toJsonSchema(spec.parameters),
   }
 }
 

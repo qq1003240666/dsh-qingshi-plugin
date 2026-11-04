@@ -72,6 +72,23 @@ check('无窗口时不弹窗、改说短信流程', /没有可用的窗口/.test
 const bad = await server.handle({ jsonrpc: '2.0', id: 5, method: 'nope/nope' })
 check('未知方法返回 -32601', bad?.error?.code === -32601, JSON.stringify(bad?.error))
 
+console.log('— inputSchema 必须是合法 JSON Schema（客户端会严格校验）')
+const badType = items.filter((t) => t.inputSchema?.type !== 'object')
+check('每个工具 inputSchema.type 都显式是 object', badType.length === 0, badType.map((t) => t.name + ':' + JSON.stringify(t.inputSchema?.type)).join(','))
+const badProps = items.filter((t) => !t.inputSchema?.properties || typeof t.inputSchema.properties !== 'object' || Array.isArray(t.inputSchema.properties))
+check('每个工具都有 properties 对象', badProps.length === 0, badProps.map((t) => t.name).join(','))
+const badReq = items.filter((t) => t.inputSchema?.required !== undefined && (!Array.isArray(t.inputSchema.required) || t.inputSchema.required.some((n) => !t.inputSchema.properties[n])))
+check('required 是数组且都在 properties 里', badReq.length === 0, badReq.map((t) => t.name).join(','))
+const evTool = items.find((t) => t.name === 'qingshi_event')
+check('qingshi_event 把 eventId 标成必填', Array.isArray(evTool?.inputSchema?.required) && evTool.inputSchema.required.includes('eventId'), JSON.stringify(evTool?.inputSchema?.required))
+const loginTool = items.find((t) => t.name === 'qingshi_login')
+check('qingshi_login 的 phone/code 都在 properties 里',
+  Boolean(loginTool?.inputSchema?.properties?.phone) && Boolean(loginTool?.inputSchema?.properties?.code),
+  Object.keys(loginTool?.inputSchema?.properties || {}).join(','))
+check('qingshi_login 的 phone 声明成 string', loginTool?.inputSchema?.properties?.phone?.type === 'string')
+const arrTool = items.filter((t) => Object.values(t.inputSchema?.properties || {}).some((p) => p?.type === 'array'))
+check('数组参数带 items', arrTool.every((t) => Object.values(t.inputSchema.properties).every((p) => p?.type !== 'array' || p.items !== undefined)), String(arrTool.length))
+
 console.log('— 工具元信息')
 check('工具名都以 qingshi_ 开头', items.every((t) => t.name.startsWith('qingshi_')))
 // 描述里可以出现「别把 uid 说给用户」这种话，但不能出现真实的 id / 事件号
