@@ -53,6 +53,13 @@ for (const name of ['qingshi_me', 'qingshi_search', 'qingshi_family']) {
   check(name + ' 未登录有可读提示', typeof out === 'string' && /登录/.test(out), String(out).slice(0, 120))
 }
 
+// 登录闸门：没凭证时只解释原因、等用户点头，不许自动弹窗
+const meTool = registered.get('qingshi_me')
+const meOut = await meTool.execute({}, {})
+check('未登录文案说明原因', /还没有青史的登录凭证|身份认证已过期/.test(meOut), String(meOut).slice(0, 60))
+check('未登录文案会征求同意', /要我现在打开登录窗吗|把手机号发我/.test(meOut), String(meOut).slice(0, 60))
+check('未登录不再宣称自动弹窗', !/会弹一个小登录窗/.test(meOut), String(meOut).slice(0, 60))
+
 if (fails.length) {
   console.error('FAILED ' + fails.length + ' / ' + (pass + fails.length))
   for (const f of fails) console.error('  ✗ ' + f)

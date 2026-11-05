@@ -535,8 +535,58 @@ export function apply(ctx, config = {}) {
     return Boolean(pendingLogin.phone) && Date.now() - pendingLogin.sentAt < pendingLogin.ttlMs
   }
 
-  // 未登录时给模型的话术：能弹窗就说弹窗，不能弹窗就引导它去要手机号和验证码。
+  // 登录闸门：只在「确认凭证失效」之后、且用户点头之后，才弹窗。
+  // kind = 'expired'（服务端 401/403，凭证真的失效了）| 'missing'（这台机器从来没登过）
+  const loginConsent = { at: 0, kind: '', ttlMs: 5 * 60 * 1000 }
+
+  function grantConsent(kind) {
+    loginConsent.at = Date.now()
+    loginConsent.kind = String(kind || 'expired')
+  }
+
+  function consentValid(kind) {
+    return loginConsent.kind === kind && Date.now() - loginConsent.at < loginConsent.ttlMs
+  }
+
+  function clearConsent() {
+    loginConsent.at = 0
+    loginConsent.kind = ''
+  }
+
+  /**
+   * 弹窗之前先说的那句话。expired 用「我本来要帮你查，但认证过期了」的口径，
+   * missing 用「第一次用得先绑定手机号」的口径——两者别混。
+   */
+  function expiredNoticeText(kind, phoneFlow) {
+    if (kind === 'missing') {
+      if (phoneFlow) {
+        return [
+          '我这台机器上还没有青史的登录凭证，所以现在读不到你的记录。',
+          '第一次用的话：微信搜小程序「青史永存」→ 注册时绑定手机号。',
+          '绑好之后把手机号发我，我发验证码，你报一下 6 位数字就能接上。',
+        ].join(NL)
+      }
+      return [
+        '我这台机器上还没有青史的登录凭证，所以现在读不到你的记录。',
+        '第一次用的话：微信搜小程序「青史永存」→ 注册时绑定手机号 → 回来我弹个登录窗，用同一个手机号登一次。',
+        '现在要我打开登录窗吗？',
+      ].join(NL)
+    }
+    if (phoneFlow) {
+      return [
+        '我可以从「青史永存」里拉取你的记录，但发现你的身份认证已经过期了（服务端返回 403）。',
+        '这台机器没法弹窗，把手机号发我，我发验证码，你报一下 6 位数字就能重新接上。',
+      ].join(NL)
+    }
+    return [
+      '我可以从「青史永存」里拉取你的记录，但发现你的身份认证已经过期了（服务端返回 403）。',
+      '重新登录一次就能继续——现在要我打开登录窗吗？（也可以直接把手机号发我，我用短信验证码帮你登。）',
+    ].join(NL)
+  }
+
+  // 未登录时给模型的话术：优先用上面带「为什么」的那段。
   function needLoginText(info) {
+    if (info && info.notice) return info.notice
     if (info && info.phoneFlow) {
       return [
         '还没登录青史（这台机器没有可用的窗口，走短信验证码登录）。',
@@ -610,37 +660,70 @@ export function apply(ctx, config = {}) {
    * 数据类工具的统一入口：先验 token，过期就自己弹登录窗，登完继续。
    * 用户不需要去小程序登录、也不需要回对话点「我已登录」。
    */
-  async function ensureLoggedIn({ allowLogin = true } = {}) {
+  async function ensureLoggedIn({ allowLogin = true, confirm = false } = {}) {
     let info = await workspace.info()
+    let kind = info.loggedIn ? '' : 'missing'
 
     // 工作区没凭证时，先问还开着的窗口要一次（用户可能刚在里面登过）
     if (!info.loggedIn) {
       const session = (await liveBrowser()) || (await attachExistingWindow())
       if (session) {
         const synced = await syncTokenFromBrowser(session).catch(() => null)
-        if (synced?.ok) info = await workspace.info()
+        if (synced?.ok) {
+          info = await workspace.info()
+          kind = info.loggedIn ? '' : 'missing'
+        }
       }
     }
 
     if (info.loggedIn) {
       const code = await probeToken(info.uid)
       if (code === 200) return { ...info, validated: true }
-      // 401/403 = 服务端不认了（authed 内部已经试过 refresh）；其它错误先放行
+      // 401/403 = 服务端明确不认了（authed 内部已经试过 refresh）→ 这才是「确认失效」
       if (code !== 401 && code !== 403) return { ...info, validated: false }
-      ctx.logger?.debug?.(`token 已失效（${code}），准备重新登录`)
+      ctx.logger?.debug?.(`token 已失效（${code}），等待用户确认后再登录`)
       info = { loggedIn: false, uid: '' }
+      kind = 'expired'
     }
 
     const windowable = cfg.openLoginWindow && canOpenWindow()
+    const phoneFlow = !windowable
+    const notice = expiredNoticeText(kind, phoneFlow)
 
-    if (!allowLogin || !windowable) {
-      // 不能弹窗（MCP、远程、无浏览器）：走文字登录，让模型去要手机号和验证码
-      return { loggedIn: false, uid: '', needLogin: true, phoneFlow: !windowable }
+    // 用户还没点头：只把「为什么需要登录」说清楚，不弹窗、不发短信。
+    if (!allowLogin || (!confirm && !consentValid(kind))) {
+      if (confirm) grantConsent(kind)
+      return {
+        loggedIn: false,
+        uid: '',
+        needLogin: true,
+        awaitingConsent: true,
+        expired: kind === 'expired',
+        phoneFlow,
+        notice,
+      }
     }
 
-    const result = await openLoginWindowAndWait({ waitSeconds: 120, reason: '登录已过期' })
+    clearConsent()
+
+    if (phoneFlow) {
+      // 没有窗口的机器：让模型去要手机号 + 验证码，登完再回来
+      return { loggedIn: false, uid: '', needLogin: true, phoneFlow: true, notice }
+    }
+
+    const result = await openLoginWindowAndWait({
+      waitSeconds: 120,
+      reason: kind === 'expired' ? '身份认证已过期' : '第一次登录',
+    })
     if (!result.ok) {
-      return { loggedIn: false, uid: '', needLogin: true, phoneFlow: true, loginMessage: result.message }
+      return {
+        loggedIn: false,
+        uid: '',
+        needLogin: true,
+        phoneFlow: true,
+        loginMessage: result.message,
+        notice,
+      }
     }
     const next = await workspace.info()
     return { ...next, validated: true }
@@ -914,6 +997,12 @@ export function apply(ctx, config = {}) {
     '- 看某一条的全文或细节 → qingshi_event（单条读），不要用 fullContent 把整批正文拉进来。',
     '- 在表单页改文字（“帮我润色一下”）→ qingshi_ui_read 看表单，qingshi_ui_type 改字段，不要跳页。',
     '',
+    '### 先问一句，再弹窗',
+    '需要登录时（工具说「身份认证已过期」或「还没有登录凭证」），先把原因说出来——',
+    '比如「我可以从青史永存里拉取你的记录，但发现身份认证过期了」，然后问一句「要我现在打开登录窗吗」。',
+    '用户同意（或自己说「重新登录」「登录青史」）之后，才调 qingshi_login 去弹窗或要手机号。',
+    '用户说「先不用」「待会儿」「算了」就别弹，也不要反复劝；照常回答那些不需要登录的问题。',
+    '',
     '### 登录完全由插件自己处理',
     '- 每次调工具前插件都会先用当前 token 打一次后端（最便宜的接口）；能通就继续，不通就自己弹「插件自己的登录小窗」，',
     '  用户在窗里输手机号 + 验证码，登完凭证自动写到固定位置（工作区的 auth.json），下次直接用。',
@@ -1093,7 +1182,9 @@ export function apply(ctx, config = {}) {
         '登录青史。能弹窗的机器（有 Electron 或 Chrome/Edge）会弹一个插件自己的登录窗口，' +
         '用户在里面输手机号 + 验证码，登完自动保存凭证、自动关窗。' +
         '不能弹窗的机器（MCP、远程、无浏览器）走短信验证码：先传 phone 发码，' +
-        '用户把收到的 6 位码告诉你，再传 code 完成登录。凭证还有效时直接报已登录（除非传 force）。',
+        '用户把收到的 6 位码告诉你，再传 code 完成登录。凭证还有效时直接报已登录（除非传 force）。' +
+        '注意：只有在「用户已经同意重新登录」之后才调用本工具——工具返回「身份认证已过期」时，' +
+        '先把原因说清楚并问一句「要我现在打开登录窗吗」，得到同意再来调；用户说要自己弄就先别调。',
       parameters: {
         phone: { type: 'string', description: '手机号（无窗口时用：传它就发验证码）' },
         code: { type: 'string', description: '短信里的 6 位验证码（无窗口时用：传它完成登录）' },
@@ -1293,12 +1384,7 @@ export function apply(ctx, config = {}) {
       output: outputSpec,
       async execute() {
         const info = await ensureLoggedIn()
-        if (!info.loggedIn) {
-          return [
-            '还没登录青史。',
-            '我这边会弹一个小登录窗，你在里面用手机号 + 验证码登一次就行；登完凭证自动存本机，以后直接用。',
-          ].join('\n')
-        }
+        if (!info.loggedIn) return needLoginText(info)
 
         // 先真打一次接口再下结论：本地有 token 不等于服务端还认（refresh_token 可能已被顶掉）
         const result = await authed('/get_career_list', {
