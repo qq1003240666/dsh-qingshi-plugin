@@ -6,6 +6,16 @@
 - **minor**：新增工具、新增页面/窗口形态、新增配置项
 - **patch**：修 bug、改提示词、调样式、改文档
 
+## 0.21.0
+
+- **请求层与小程序端对齐**：`lib/request.js` 新增 `normalizeRequestOptions()`，`needAccessToken` 默认改为 `true`
+  （与 `utils/request.js` 一致），支持 `needToken` / `autoRefresh` 别名，并保留 `showErrorToast` /
+  `showServerErrorMessage` 参数（插件里转成日志）；新增 `getCurrentUid()`、`clearAuthStorage()`。
+- **补齐 utils 纯函数**：新增 `lib/format.js`，把 `utils/platform.js` 的 `detectClientPlatform()` 与
+  `utils/format.js` 的 `formatDate` / `formatDateTime` / `formatFileSize` 照搬过来。
+- **新文档 `docs/AUTH-AND-REQUEST.md`**：登录三条路 → token 落盘 → 每次调用前预检 → 请求 → 401 续期 → 403 重登，
+  含时序图与逐项对照表。
+
 ## 0.20.0
 
 - **新工具 `qingshi_about_me`**（31 个工具）：一句话回答「我是谁 / 我去过哪里 / 你了解我吗」这类模糊提问——

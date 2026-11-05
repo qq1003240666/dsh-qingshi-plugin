@@ -17,6 +17,7 @@ try {
 }
 import { createWorkspace } from './lib/workspace.js'
 import { pickHomeDir, describeHomeDir, migrateLegacy, shouldMigrate } from './lib/paths.js'
+import { formatDate } from './lib/format.js'
 import { createRequest } from './lib/request.js'
 import { createDraftStore } from './lib/drafts.js'
 import { createUploader } from './lib/upload.js'
@@ -1725,7 +1726,7 @@ export function apply(ctx, config = {}) {
             lines.push('最近的几条：')
             for (const e of recent) {
               const tag = plainTag(e.eventTag)
-              lines.push('· ' + String(e.startDate || '') + '  ' + (e.title || '（没写标题）') + (tag && tag !== '其他' ? '（' + tag + '）' : ''))
+              lines.push('· ' + formatDate(e.startDate) + '  ' + (e.title || '（没写标题）') + (tag && tag !== '其他' ? '（' + tag + '）' : ''))
             }
           }
         }

@@ -155,6 +155,7 @@ QINGSHI_HOME=D:\my-data\qingshi      # 任意可写目录，优先级最高
 | 改了代码没生效 | 插件只在 Harness 启动时加载，完全退出再打开 |
 
 详细的实现说明、工具清单与配置项见 [`docs/MAINTAINER-NOTES.md`](docs/MAINTAINER-NOTES.md)（面向改代码的人）。
+登录与请求的完整链路（token 存哪、过期怎么办、和青史小程序端怎么对应）见 [`docs/AUTH-AND-REQUEST.md`](docs/AUTH-AND-REQUEST.md)。
 
 ---
 
