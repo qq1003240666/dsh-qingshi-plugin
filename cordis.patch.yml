@@ -18,6 +18,8 @@
         clientPlatform: plugin
         # 登录时通过请求头 X-Client-Platform 告诉后端的平台名（留空 = 不拦截，后端会记成 h5）
         requestPlatform: plugin
+        # 写记录时在正文末尾署名的名字（留空 = 自动判断：DSH / MCP 客户端名 / 「AI 助手」）
+        clientName: ''
         # 窗口形态：
         #   electron = 自带桌面外壳，无边框 + 自绘奶油色标题栏，只有一个 ✕（推荐）
         #   app      = Chrome 应用窗口，固定宽高，带系统标题栏（最小化/最大化/关闭）

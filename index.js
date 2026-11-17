@@ -10,8 +10,10 @@
 // 宿主可以是 DSH（有 @deepseek-ai/dsh-tools），也可以是 MCP server 这种没有它的环境。
 // 没有就把 defineTool 退化成恒等函数：工具定义本来就只是一个普通对象。
 let defineTool = (spec) => spec
+let dshHost = false
 try {
   ;({ defineTool } = await import('@deepseek-ai/dsh-tools'))
+  dshHost = true
 } catch {
   // 非 DSH 环境：保持恒等实现
 }
@@ -29,8 +31,13 @@ import { PAGES, findPages, pageUrl, pageBrief } from './lib/pages-map.js'
 import { installWindowBar } from './lib/window-bar.js'
 import { createCareerApi } from './lib/career-api.js'
 import { createUserCache } from './lib/users.js'
+import { setHost, setClientInfo, resolveClientLabel, appendAttribution } from './lib/attribution.js'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
+// 记下「我在谁家跑」，写记录时署名要用（DSH / MCP 客户端 / 独立运行）
+setHost(dshHost ? 'dsh' : 'standalone')
+if (process.env.QINGSHI_CLIENT_NAME) setClientInfo(process.env.QINGSHI_CLIENT_NAME)
 
 // /edit_event 的字段中文名与展示方式（改完要给用户看「什么变成了什么」）
 const FIELD_LABELS_PLUGIN = {
@@ -142,6 +149,40 @@ const TAG_LABELS = {
   turning_point: '转折',
 }
 
+// 写记录时给用户的标签清单（顺序与后端 EVENT_TAG_VALUES 一致）
+const TAG_ORDER = [
+  'record', 'birthday', 'happy', 'family', 'friend', 'party', 'festival',
+  'work', 'study', 'growth', 'achievement', 'challenge', 'idea', 'memorial',
+  'summary', 'travel', 'scenery', 'food', 'memory', 'sad', 'love',
+  'consume', 'save', 'turning',
+]
+const TAG_HINTS = {
+  record: '日常里想留下的一件事',
+  birthday: '谁的生日',
+  happy: '开心的一天',
+  family: '和家人有关',
+  friend: '和朋友有关',
+  party: '聚会、饭局',
+  festival: '节日',
+  work: '工作上的事',
+  study: '学习、考试、读书',
+  growth: '自己的变化',
+  achievement: '做成了什么',
+  challenge: '难熬、撑过去的事',
+  idea: '突然想到的念头',
+  memorial: '怀念、祭奠',
+  summary: '一段时间的总结',
+  travel: '出门旅行',
+  scenery: '看到的风景',
+  food: '吃到的东西',
+  memory: '回忆过去',
+  sad: '难过的事',
+  love: '感情',
+  consume: '花了一笔钱',
+  save: '存下、攒下了',
+  turning: '人生转折',
+}
+
 const tagLabel = (tag) => (TAG_LABELS[tag] ? `${TAG_LABELS[tag]}(${tag})` : tag || '记录')
 
 // 同一类事件在线上有过两种写法，比较/统计时先归一
@@ -204,6 +245,8 @@ export function apply(ctx, config = {}) {
     // 后端按 X-Client-Platform 隔离 refresh_token 行（uid + platform 一行）。
     // 插件用自己的标识，就不会和微信小程序/h5 互相顶号。
     clientPlatform: String(config.clientPlatform || 'plugin').trim() || 'plugin',
+    // 署名用：写记录时在正文末尾加「—— 本条由 <名字> 协助录入」
+    clientName: String(config.clientName || '').trim(),
     // 登录时给后端的平台标记：留空 = 不拦截（后端会记成 h5/unknown）
     requestPlatform: String(config.requestPlatform === undefined ? 'plugin' : config.requestPlatform || '').trim(),
     autoRecord: ['off', 'suggest', 'auto'].includes(String(config.autoRecord || ''))
@@ -1052,6 +1095,17 @@ export function apply(ctx, config = {}) {
     '- 只有用户明确问“这条的 id 是什么”“我要拿 id 去别处用”时，才把 id 单独给他。',
     '- 结尾别老是“如需…请告诉我”，也别每条都追问；说完了就停。',
     '',
+    '### 写一条之前，先过三步（用户明确要求的流程）',
+    '1. **先问要不要记**：把「标题 / 内容 / 标签」原样报给用户看，并问他确认不确认。标签从 qingshi_tags 里挑，',
+    '   报的时候写「工作(work)」这种形式；用户问「有哪些标签」就调 qingshi_tags 把 24 个列给他。',
+    '2. **再问图片和地址**：明确问一句「要不要上传图片、或者在地图上确认一下地址？」。',
+    '   要 → 用 qingshi_prepare_event 打开「添加生涯事件」页面让他补图片/地点，补完他自己点发布；',
+    '   不要 → 用 qingshi_record 传 confirm:true 直接写进云端。',
+    '3. **写完**：插件会自动在正文末尾加一行「—— 本条由 <AI 工具名> 协助录入」，你不用自己写、也不要改写它。',
+    '   然后告诉用户记好了，并顺一句「这条现在是所有人可见，要只自己看就说一声」。',
+    '',
+    'qingshi_record 不传 confirm 时只会返回预览、不会写云端——这是故意的，别绕过它直接写。',
+    '',
     '### 草稿 vs 云端（这条最重要，别混）',
     '- qingshi_draft 只写本机 workspace 里的 drafts.json（连同图片），**不算保存**，换台机器就没了；不需要登录。',
     '- qingshi_publish 才是真写云端：图片先传 OSS、再调 /add_event 落库，属于**永久保存**（应用定位就是“记忆永久留存”）。',
@@ -1108,7 +1162,7 @@ export function apply(ctx, config = {}) {
       of_type: 'user',
       of_id: draft.targetUid || info.uid,
       title: draft.title,
-      content: draft.content,
+      content: appendAttribution(draft.content, resolveClientLabel(cfg)),
       start_date: draft.startDate,
       event_tag: draft.eventTag || 'record',
     }
@@ -1677,6 +1731,12 @@ export function apply(ctx, config = {}) {
         eventTag: { type: 'string', description: '标签，见 qingshi_search，默认 record' },
         location: { type: 'string', description: '地点名称' },
         targetUid: { type: 'string', description: '给谁记；不填就是用户自己' },
+        confirm: {
+          type: 'boolean',
+          description:
+            '必须先把标题/正文/标签报给用户确认、并问清要不要加图片或确认地址；' +
+            '用户明确同意“就这样记”之后才传 true 真正写入。不传只返回待确认的预览。',
+        },
         privacy: {
           type: 'string',
           description: '可见性：all 所有人可见（默认）/ private 仅自己可见 / selected 指定人可见',
@@ -1689,13 +1749,38 @@ export function apply(ctx, config = {}) {
       },
       output: outputSpec,
       async execute(args) {
-        const info = await ensureLoggedIn()
-        if (!info.loggedIn) return needLoginText(info)
-
         const title = String(args?.title || '').trim()
         const content = String(args?.content || '').trim()
         if (!title) return '标题不能为空。'
         if (!content) return '正文不能为空，否则这条记录没有意义。'
+
+        const startDate = String(args?.startDate || '').trim() || todayText()
+        const eventTag = String(args?.eventTag || 'record').trim() || 'record'
+        const locationText = String(args?.location || '').trim()
+
+        // 第一次调用（没传 confirm）只给预览，不写云端：
+        // 让用户先看到标题/正文/标签，并且先把「要不要加图片、要不要确认地址」问清楚。
+        if (args?.confirm !== true) {
+          return [
+            '要记的这条（还没写进云端）：',
+            '标题：' + title,
+            '内容：' + content,
+            '标签：' + tagLabel(eventTag),
+            '时间：' + startDate + (args?.endDate ? ' ～ ' + String(args.endDate).trim() : ''),
+            locationText ? '地点：' + locationText : '',
+            '',
+            '两个问题：',
+            '1）要不要上传图片、或者在地图上确认一下地址？要就说一声，我打开「添加生涯事件」页面让你补，补完你自己点发布。',
+            '2）不用图片和地址的话，就直接说「就这样记」，我马上写进云端。',
+            '',
+            '写进云端之后是永久保存，默认「所有人可见」，要只自己看可以告诉我。',
+          ]
+            .filter((line) => line !== '')
+            .join('\n')
+        }
+
+        const info = await ensureLoggedIn()
+        if (!info.loggedIn) return needLoginText(info)
 
         const targetUid = String(args?.targetUid || '').trim() || info.uid
         const isSelf = !targetUid || targetUid === info.uid
@@ -1705,14 +1790,14 @@ export function apply(ctx, config = {}) {
             `要写到 uid: ${targetUid}，需要用户在插件配置里打开“允许代家人记录”，或改为记在本人名下。`,
           ].join('\n')
         }
-
         const payload = {
           of_type: 'user',
           of_id: targetUid,
           title,
-          content,
-          start_date: String(args?.startDate || '').trim() || todayText(),
-          event_tag: String(args?.eventTag || 'record').trim() || 'record',
+          // 正文末尾署名：这条是哪个 AI 工具帮着录的
+          content: appendAttribution(content, resolveClientLabel(cfg)),
+          start_date: startDate,
+          event_tag: eventTag,
         }
         if (args?.endDate) payload.end_date = String(args.endDate).trim()
         // 后端字段名是大写 S 的 is_Stage，写成 is_stage 会被当成普通事件
@@ -1740,6 +1825,30 @@ export function apply(ctx, config = {}) {
         }
 
         return `已记入青史：${title}${eventId ? `（event_id: ${eventId}）` : ''}${privacyLine}`
+      },
+    }),
+  )
+
+  // ---------- qingshi_tags ----------
+  // 写记录前要先跟用户对齐「标签用哪个」，这个工具把 24 个标签连同示例一次给出，
+  // 不用模型自己回忆、也不会编出不存在的标签。
+  ctx.tools.register(
+    defineTool({
+      name: 'qingshi_tags',
+      description:
+        '【写记录前先看标签】返回青史支持的全部事件标签（24 个）和一句话示例，' +
+        '用户问「有哪些标签」「不知道该选哪个」或者你要在确认框里报标签时调用。不需要登录。',
+      parameters: {},
+      output: outputSpec,
+      async execute() {
+        const lines = ['青史的事件标签一共 24 种，写的时候挑最贴的一个：']
+        for (const key of TAG_ORDER) {
+          lines.push('· ' + TAG_LABELS[key] + '(' + key + ')  ' + (TAG_HINTS[key] || ''))
+        }
+        lines.push('')
+        lines.push('线上老数据里还有 hobby(爱好)、spending(消费)、savings(储蓄)、turning_point(转折) 这几种旧写法，')
+        lines.push('读的时候会自动归一，写的时候请用上面 24 个里的。')
+        return lines.join(NL)
       },
     }),
   )
@@ -3020,7 +3129,7 @@ export function apply(ctx, config = {}) {
         const startDate = String(args?.startDate || '').trim() || todayText()
         const prefill = {
           title,
-          content,
+          content: appendAttribution(content, resolveClientLabel(cfg)),
           start_date: startDate,
           end_date: String(args?.endDate || '').trim(),
           is_Stage: Boolean(args?.isStage),

@@ -1,4 +1,4 @@
-// 青史 MCP server —— 把插件的 29 个工具暴露成标准 MCP tools，
+// 青史 MCP server —— 把插件的工具暴露成标准 MCP tools，
 // 让 Codex / Claude Code / Cursor / Cline / WorkBuddy 等任何 MCP 客户端都能用。
 //
 // 复用的就是 DSH 插件本身：这里造一个假的 ctx 接住 ctx.tools.register()，
@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline'
 import { readFileSync } from 'node:fs'
 
 import * as plugin from '../index.js'
+import { setClientInfo } from '../lib/attribution.js'
 
 const PROTOCOL_VERSION = '2024-11-05'
 const SERVER_NAME = 'qingshi'
@@ -155,6 +156,10 @@ export function createServer({ tools, instructions }) {
     const isNotification = id === undefined || id === null
 
     if (method === 'initialize') {
+      // 客户端在 initialize 里会报名字（claude-code / codex / workbuddy …），
+      // 写记录时用它给正文署名，用户就知道这条是哪个 AI 帮着录的。
+      const clientName = params?.clientInfo?.name
+      if (clientName) setClientInfo(clientName)
       return ok(id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
