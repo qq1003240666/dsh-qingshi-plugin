@@ -6,6 +6,16 @@
 - **minor**：新增工具、新增页面/窗口形态、新增配置项
 - **patch**：修 bug、改提示词、调样式、改文档
 
+## 0.23.1
+
+- **窗口有图标了**：桌面外壳（主窗口 + 登录小窗）带上 `assets/icon.ico`（16/24/32/48/64/128/256 七种尺寸），
+  任务栏和 Alt-Tab 里显示的是青史图标，不再是 Electron 默认的原子。
+- **插件图标换成同一张**：`exports["./icon"]` 指向 `assets/plugin-icon.png`（≤256KiB，符合插件图标规范），
+  根目录 `icon.svg` 也内嵌了同一张图，旧路径仍可用。
+- 顺带设了 `app.setAppUserModelId('com.qingshi.desktop')`，避免 Windows 把窗口归到 electron.exe 名下、
+  图标跟着串味。
+- 新增 `scripts/build-icon.mjs`：从 `assets/plugin-icon.png` 一次生成全部尺寸 + `icon.ico`。
+
 ## 0.23.0
 
 - **写入流程改成三步确认**：`qingshi_record` 新增 `confirm` 参数——不传时只返回「标题 / 内容 / 标签 / 时间 / 地点」的预览

@@ -26,6 +26,21 @@ if (process.env.QINGSHI_DEBUG_PORT && process.env.QINGSHI_DEBUG_PORT !== '0') {
 
 let win = null
 
+// 窗口 / 任务栏图标：优先 .ico（Windows），退到 256 PNG；都没有就不设
+const ICON_PATH = [
+  path.join(__dirname, '..', 'assets', 'icon.ico'),
+  path.join(__dirname, '..', 'assets', 'icon-256.png'),
+].find((p) => {
+  try {
+    return require('node:fs').statSync(p).isFile()
+  } catch {
+    return false
+  }
+})
+// 任务栏分组名：不设的话 Windows 会把窗口归到 electron.exe 名下，图标也跟着不对
+app.setAppUserModelId('com.qingshi.desktop')
+if (!ICON_PATH) console.error('[qingshi-shell] 找不到图标文件，窗口会用 Electron 默认图标')
+
 // 同一个 profile 只允许一个实例：第二个直接退出，避免多个进程抢同一份 userData
 // 导致渲染进程崩溃、进而触发 crashpad 弹窗。
 const gotLock = app.requestSingleInstanceLock()
@@ -55,6 +70,7 @@ function createWindow() {
     fullscreenable: false,
     backgroundColor: '#f6f0e4',
     title: '青史',
+    ...(ICON_PATH ? { icon: ICON_PATH } : {}),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

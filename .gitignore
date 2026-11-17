@@ -10,3 +10,7 @@ Thumbs.db
 login-window-profile/
 electron-profile/
 .pack/
+
+.npm-cache/
+.pack/
+.tmp/
